@@ -1,10 +1,12 @@
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap');
-
-html { direction: rtl; }
+html {
+  direction: rtl;
+}
 
 body {
   font-family: 'Cairo', Tahoma, Arial, sans-serif;
@@ -41,13 +43,4 @@ body {
   .badge {
     @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border;
   }
-}
-
-.animate-fade-in {
-  animation: fade-in 0.3s ease-out;
-}
-
-@keyframes fade-in {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
 }
