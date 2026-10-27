@@ -1,46 +1,69 @@
-@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-html {
-  direction: rtl;
-}
-
 body {
-  font-family: 'Cairo', Tahoma, Arial, sans-serif;
+  font-family: Tahoma, Arial, sans-serif;
   background: #0a0a0a;
   color: #f5f5f5;
+  margin: 0;
   min-height: 100vh;
 }
 
-@layer components {
-  .btn-primary {
-    @apply bg-amber-700 hover:bg-amber-600 text-white font-medium px-5 py-2.5 rounded-xl transition-all;
-  }
-  .btn-secondary {
-    @apply bg-zinc-800 hover:bg-zinc-700 text-zinc-100 font-medium px-5 py-2.5 rounded-xl border border-zinc-700;
-  }
-  .btn-danger {
-    @apply bg-red-600 hover:bg-red-500 text-white font-medium px-5 py-2.5 rounded-xl;
-  }
-  .btn-success {
-    @apply bg-emerald-600 hover:bg-emerald-500 text-white font-medium px-5 py-2.5 rounded-xl;
-  }
-  .card {
-    @apply bg-zinc-900/80 border border-zinc-800 rounded-2xl p-5;
-  }
-  .input-field {
-    @apply w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500;
-  }
-  .label {
-    @apply block text-sm font-medium text-zinc-400 mb-1.5;
-  }
-  .stat-card {
-    @apply card flex flex-col gap-1;
-  }
-  .badge {
-    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border;
-  }
+.btn-primary {
+  background: #b45309;
+  color: white;
+  border: none;
+  border-radius: 12px;
+  padding: 12px 20px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-success {
+  background: #059669;
+  color: white;
+  border: none;
+  border-radius: 12px;
+  padding: 16px 20px;
+  font-weight: 600;
+  cursor: pointer;
+  width: 100%;
+}
+
+.btn-danger {
+  background: #dc2626;
+  color: white;
+  border: none;
+  border-radius: 12px;
+  padding: 16px 20px;
+  font-weight: 600;
+  cursor: pointer;
+  width: 100%;
+}
+
+.card {
+  background: #18181b;
+  border: 1px solid #27272a;
+  border-radius: 16px;
+  padding: 20px;
+}
+
+.input-field {
+  width: 100%;
+  background: #18181b;
+  border: 1px solid #3f3f46;
+  border-radius: 12px;
+  padding: 14px;
+  color: #f5f5f5;
+  font-size: 18px;
+  box-sizing: border-box;
+  text-align: center;
+}
+
+.label {
+  display: block;
+  color: #a1a1aa;
+  font-size: 14px;
+  margin-bottom: 8px;
 }
