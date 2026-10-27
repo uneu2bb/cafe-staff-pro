@@ -1,6 +1,8 @@
+export const dynamic = 'force-dynamic'
+
 import { createClient } from '@/lib/supabase/server'
-import { Users, UserCheck, UserX, Clock, CalendarDays, AlertTriangle, LogIn, Timer } from 'lucide-react'
-import { formatTime, getStatusColor, getStatusLabel } from '@/lib/utils'
+import { Users, UserCheck, UserX, Clock, AlertTriangle, LogIn, Timer } from 'lucide-react'
+import { formatTime } from '@/lib/utils'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -16,11 +18,11 @@ export default async function DashboardPage() {
     supabase.from('attendance_records').select('*, profiles(full_name, employee_number)').order('recorded_at', { ascending: false }).limit(10),
   ])
 
-  const present = todayAttendance?.filter((a: any) => a.status === 'present' || a.status === 'late').length || 0
-  const late = todayAttendance?.filter((a: any) => a.status === 'late').length || 0
-  const absent = todayAttendance?.filter((a: any) => a.status === 'absent').length || 0
-  const incomplete = todayAttendance?.filter((a: any) => a.check_in_at && !a.check_out_at).length || 0
-  const totalMins = todayAttendance?.reduce((s: number, a: any) => s + (a.net_worked_minutes || 0), 0) || 0
+  const present = todayAttendance?.filter((a: { status: string }) => a.status === 'present' || a.status === 'late').length || 0
+  const late = todayAttendance?.filter((a: { status: string }) => a.status === 'late').length || 0
+  const absent = todayAttendance?.filter((a: { status: string }) => a.status === 'absent').length || 0
+  const incomplete = todayAttendance?.filter((a: { check_in_at?: string; check_out_at?: string }) => a.check_in_at && !a.check_out_at).length || 0
+  const totalMins = todayAttendance?.reduce((s: number, a: { net_worked_minutes?: number }) => s + (a.net_worked_minutes || 0), 0) || 0
 
   const stats = [
     { label: 'إجمالي الموظفين', value: totalEmployees || 0, icon: Users, color: 'text-blue-400', bg: 'bg-blue-500/10' },
@@ -54,7 +56,7 @@ export default async function DashboardPage() {
           <p className="text-zinc-500 text-sm text-center py-8">لا توجد عمليات بعد</p>
         ) : (
           <div className="space-y-3">
-            {recentRecords.map((rec: any) => (
+            {recentRecords.map((rec: { id: string; record_type: string; recorded_at: string; profiles?: { full_name?: string } }) => (
               <div key={rec.id} className="flex items-center gap-3 p-3 rounded-xl bg-zinc-800/40 border border-zinc-800">
                 <div className={'w-9 h-9 rounded-lg flex items-center justify-center ' + (rec.record_type === 'check_in' ? 'bg-emerald-500/15' : 'bg-red-500/15')}>
                   {rec.record_type === 'check_in' ? <LogIn size={16} className="text-emerald-400" /> : <Clock size={16} className="text-red-400" />}
