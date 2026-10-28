@@ -38,10 +38,11 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 })
 
   const db = adminDb()
+  // employee_status enum: active | suspended | resigned (لا يوجد archived)
   const { data, error } = await db
     .from('profiles')
     .select('id, full_name, employee_number, salary_amount, salary_type, hire_date, work_hours_per_day, weekly_off_days, status, job_title, phone, notes, pin_code, role')
-    .neq('status', 'archived')
+    .in('status', ['active', 'suspended'])
     .order('full_name')
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -97,7 +98,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: authError?.message || 'فشل إنشاء الحساب' }, { status: 500 })
   }
 
-  // التريغر ينشئ بروفايل أساسي — نحدّثه بالبيانات الكاملة
   const { data, error } = await db.from('profiles').update({
     full_name: String(full_name).trim(),
     employee_number: empNo,

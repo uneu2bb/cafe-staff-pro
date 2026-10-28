@@ -48,6 +48,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   for (const k of allowed) {
     if (body[k] !== undefined) patch[k] = body[k]
   }
+  // فقط قيم enum المسموحة
+  if (patch.status && !['active', 'suspended', 'resigned'].includes(String(patch.status))) {
+    return NextResponse.json({ error: 'حالة غير صالحة' }, { status: 400 })
+  }
   patch.updated_at = new Date().toISOString()
 
   const db = adminDb()
@@ -62,9 +66,9 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
 
   const { id } = await params
   const db = adminDb()
-  // حذف منطقي
+  // حذف منطقي باستخدام resigned (موجود في الـ enum)
   const { error } = await db.from('profiles').update({
-    status: 'archived',
+    status: 'resigned',
     updated_at: new Date().toISOString(),
   }).eq('id', id)
 
