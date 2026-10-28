@@ -61,7 +61,9 @@ export async function GET(req: NextRequest) {
   const hoursPerDay = Number(emp.work_hours_per_day) || 8
   const monthlySalary = Number(emp.salary_amount) || 0
 
-  // أساس الحساب: 30 يوم عمل في الشهر (راتب يومي = الراتب ÷ 30)
+  // اليومية = الراتب ÷ 30
+  // أجر الساعة = اليومية ÷ ساعات اليوم المحددة
+  // إجمالي أجر الساعات = ساعات الدوام الفعلية × أجر الساعة
   const expectedWorkDays = 30
   const dayRate = monthlySalary / expectedWorkDays
   const hourlyRate = hoursPerDay > 0 ? dayRate / hoursPerDay : 0
@@ -76,6 +78,7 @@ export async function GET(req: NextRequest) {
   }
 
   const totalHours = totalMinutes / 60
+  const earnedByHours = totalHours * hourlyRate
   const fixedWithDeductions = Math.max(0, monthlySalary - absentDays * dayRate)
 
   let withdrawnUsd = 0
@@ -103,7 +106,10 @@ export async function GET(req: NextRequest) {
     else if (w.currency === 'TRY') withdrawnUsd += amt / rates.TRY
   }
 
-  const net = Math.max(0, fixedWithDeductions - withdrawnUsd)
+  // الصافي حسب أجر الساعات − السحوبات
+  const net = Math.max(0, earnedByHours - withdrawnUsd)
+  // صافي الراتب الثابت (بعد غياب وسحوبات) كمرجع
+  const netFixed = Math.max(0, fixedWithDeductions - withdrawnUsd)
 
   return NextResponse.json({
     employee: emp,
@@ -120,9 +126,11 @@ export async function GET(req: NextRequest) {
       dayRate,
       hourlyRate,
       hoursPerDay,
+      earnedByHours,
       fixedWithDeductions,
       withdrawnUsd,
       net,
+      netFixed,
       rates,
     },
     withdrawals: withdrawalList,
