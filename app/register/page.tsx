@@ -69,7 +69,7 @@ export default function RegisterPage() {
                 required
                 value={cafeName}
                 onChange={(e) => setCafeName(e.target.value)}
-                placeholder="مثال: كافيه الشغف"
+                placeholder=""
                 style={{ textAlign: 'right' }}
               />
             </div>
@@ -80,7 +80,7 @@ export default function RegisterPage() {
                 required
                 value={ownerName}
                 onChange={(e) => setOwnerName(e.target.value)}
-                placeholder="الاسم الكامل"
+                placeholder=""
                 style={{ textAlign: 'right' }}
               />
             </div>
@@ -92,7 +92,7 @@ export default function RegisterPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="email@example.com"
+                placeholder=""
                 dir="ltr"
                 style={{ textAlign: 'left' }}
               />
@@ -106,7 +106,7 @@ export default function RegisterPage() {
                 minLength={6}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="6 أحرف على الأقل"
+                placeholder=""
                 dir="ltr"
                 style={{ textAlign: 'left' }}
               />
