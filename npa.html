@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0b1712">
+<title>Cafe Staff Pro | نظام حضور الموظفين</title>
+<style>
+:root{--bg:#080d0b;--panel:#111f19;--panel2:#0b1712;--line:#2b4437;--text:#f3f7f4;--muted:#a8bbb0;--lime:#b7f36b;--green:#143a29;--red:#3b211f}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;color:var(--text);font-family:Tahoma,Arial,sans-serif;background:radial-gradient(ellipse at top,#183d31 0%,#0b1712 48%,var(--bg) 100%)}
+a{color:inherit;text-decoration:none}
+.wrap{width:min(1060px,100% - 36px);margin:auto}
+header{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;padding:26px 0 34px}
+.brand{display:flex;align-items:center;gap:12px}
+.logo{display:grid;place-items:center;width:48px;height:48px;border-radius:16px;background:var(--lime);color:#10251b;font-weight:900;font-size:26px}
+.brand strong{display:block;font-size:20px}.brand small{color:var(--muted)}
+.admin{border:1px solid #3c5549;border-radius:12px;padding:11px 16px;color:#d6e6dc}
+.layout{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:28px;align-items:center}
+.intro{padding:24px 0}
+.badge{display:inline-block;background:#17362a;color:#c8f5a2;border:1px solid #2e5940;border-radius:99px;padding:8px 13px;font-size:13px;margin-bottom:22px}
+h1{font-size:clamp(36px,5.5vw,60px);line-height:1.2;margin:0 0 18px;letter-spacing:-1px}
+.accent{color:var(--lime)}
+.lead{color:var(--muted);font-size:17px;line-height:1.9;max-width:470px}
+.clockbox{border-top:1px solid #263a31;margin-top:28px;padding-top:22px}
+.date{color:#9cb2a5;font-size:14px;margin-bottom:8px}
+.clock{font-size:clamp(34px,6vw,52px);font-weight:750;font-variant-numeric:tabular-nums;letter-spacing:2px}
+.hint{color:#789183;font-size:12px;margin-top:8px}
+.card{background:rgba(17,31,25,.94);border:1px solid var(--line);border-radius:28px;padding:clamp(22px,4vw,36px);box-shadow:0 24px 80px #0005}
+.eyebrow{color:var(--lime);font-size:13px;font-weight:700;margin-bottom:10px}
+h2{margin:0 0 8px;font-size:28px}
+.sub{margin:0 0 24px;color:#9eb2a5;line-height:1.8;font-size:14px}
+label{display:block;color:#d9e6dd;font-size:14px;margin-bottom:9px}
+input{width:100%;padding:16px;border-radius:14px;border:1px solid #344b3f;background:var(--panel2);color:var(--text);font-size:16px;margin-bottom:20px;outline-color:var(--lime)}
+input::placeholder{color:#698073}
+.buttons{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+button{border-radius:14px;padding:16px 8px;font-weight:800;font-size:15px;cursor:pointer;transition:transform .15s,opacity .15s}
+button:active{transform:scale(.98)}button:disabled{opacity:.6;cursor:wait}
+.checkin{border:0;background:var(--lime);color:#102018}
+.checkout{border:1px solid #456153;background:#1b3025;color:#e3f0e7}
+.notice{display:none;border-radius:14px;padding:14px;margin-bottom:18px;line-height:1.7}
+.notice.show{display:block}.notice.ok{background:#143a29;border:1px solid #32734b;color:#c6f5d3}.notice.error{background:var(--red);border:1px solid #80413b;color:#ffd1ca}
+.secure{text-align:center;color:#789183;font-size:12px;margin-top:23px}
+footer{text-align:center;color:#647c6e;font-size:12px;padding:42px 0 24px}
+@media(max-width:760px){.wrap{width:min(560px,100% - 28px)}header{padding:20px 0 26px}.layout{grid-template-columns:1fr;gap:20px}.intro{padding:8px 0}.lead{font-size:16px}.card{border-radius:22px}.clockbox{margin-top:20px}}
+@media(max-width:380px){.buttons{grid-template-columns:1fr}.clock{letter-spacing:0}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="brand" href="#" aria-label="Cafe Staff Pro">
+      <span class="logo">C</span>
+      <span><strong>Cafe Staff Pro</strong><small>نظام إدارة دوام الموظفين</small></span>
+    </a>
+    <a class="admin" href="#admin-note" onclick="showAdminNote(event)">لوحة الإدارة ↗</a>
+  </header>
+
+  <main class="layout">
+    <section class="intro">
+      <div class="badge">● نظام تسجيل الدوام</div>
+      <h1>بداية يومك،<br><span class="accent">تبدأ من هنا.</span></h1>
+      <p class="lead">سجّل حضورك أو انصرافك بخطوات بسيطة. أدخل بياناتك الوظيفية ثم اختر الإجراء المناسب.</p>
+      <div class="clockbox">
+        <div class="date" id="date">جارٍ تحميل التاريخ...</div>
+        <div class="clock" id="clock">--:--:--</div>
+        <div class="hint">التوقيت المحلي للجهاز</div>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="form-title">
+      <div class="eyebrow">تسجيل الدوام</div>
+      <h2 id="form-title">أهلاً بك 👋</h2>
+      <p class="sub">استخدم بياناتك المسجلة لدى الإدارة.</p>
+      <div id="notice" class="notice" role="status" aria-live="polite"></div>
+      <form id="attendance-form">
+        <label for="employee-number">الرقم الوظيفي</label>
+        <input id="employee-number" name="employee_number" autocomplete="username" inputmode="numeric" placeholder="مثال: 001" required>
+        <label for="employee-pin">الرمز السري</label>
+        <input id="employee-pin" name="pin" type="password" autocomplete="current-password" inputmode="numeric" placeholder="أدخل الرمز السري" maxlength="12" required>
+        <div class="buttons">
+          <button class="checkin" type="button" id="check-in">✓ تسجيل الحضور</button>
+          <button class="checkout" type="button" id="check-out">↗ تسجيل الانصراف</button>
+        </div>
+      </form>
+      <div class="secure">🔒 مخصص للموظفين المسجلين لدى الإدارة</div>
+    </section>
+  </main>
+  <footer>Cafe Staff Pro · نظام حضور وانصراف الموظفين</footer>
+</div>
+
+<script>
+/*
+  هذه نسخة HTML مستقلة للواجهة والمعاينة.
+  حتى يتصل التسجيل بقاعدة بيانات مشروع Next.js، غيّر API_ENDPOINT أدناه
+  إلى رابط مشروعك المنشور. يجب أن يدعم الخادم نفس البيانات المرسلة.
+*/
+const API_ENDPOINT = ""; // مثال: https://your-project.vercel.app/api/attendance/punch
+
+function updateClock(){
+  const now = new Date();
+  document.getElementById('clock').textContent = now.toLocaleTimeString('ar-SY',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
+  document.getElementById('date').textContent = now.toLocaleDateString('ar-SY',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+}
+updateClock(); setInterval(updateClock,1000);
+
+const notice = document.getElementById('notice');
+function showMessage(message, type){
+  notice.textContent = message;
+  notice.className = 'notice show ' + (type === 'ok' ? 'ok' : 'error');
+}
+async function punch(type){
+  const employeeNumber = document.getElementById('employee-number').value.trim();
+  const pin = document.getElementById('employee-pin').value.trim();
+  if(!employeeNumber || !pin){showMessage('يرجى إدخال الرقم الوظيفي والرمز السري.','error');return;}
+  const buttons = [...document.querySelectorAll('button')];
+  buttons.forEach(b=>b.disabled=true);
+  const clicked = document.getElementById(type === 'check_in' ? 'check-in' : 'check-out');
+  const oldText = clicked.textContent;
+  clicked.textContent = 'جارٍ التسجيل...';
+  try{
+    if(!API_ENDPOINT){
+      showMessage('الواجهة جاهزة للمعاينة، لكن التسجيل الحقيقي يحتاج ربطها بعنوان API الخاص بمشروعك.','error');
+      return;
+    }
+    const response = await fetch(API_ENDPOINT,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({employee_number:employeeNumber,pin,type,verification_method:'pin'})
+    });
+    const data = await response.json();
+    if(response.ok && data.success){
+      showMessage(data.message || (type==='check_in'?'تم تسجيل الحضور بنجاح.':'تم تسجيل الانصراف بنجاح.'),'ok');
+      document.getElementById('employee-pin').value='';
+    }else{
+      showMessage(data.error || 'لم نتمكن من إتمام العملية. تحقق من البيانات وحاول مجدداً.','error');
+    }
+  }catch(e){
+    showMessage('تعذر الاتصال بالخادم. تحقق من رابط API والإنترنت.','error');
+  }finally{
+    buttons.forEach(b=>b.disabled=false);
+    clicked.textContent=oldText;
+  }
+}
+document.getElementById('check-in').addEventListener('click',()=>punch('check_in'));
+document.getElementById('check-out').addEventListener('click',()=>punch('check_out'));
+function showAdminNote(e){
+  e.preventDefault();
+  showMessage('هذه صفحة واجهة الحضور فقط. لوحة الإدارة تحتاج ربطها بصفحة الإدارة الموجودة في مشروعك.','error');
+}
+</script>
+</body>
+</html>
