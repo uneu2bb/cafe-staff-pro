@@ -82,14 +82,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'الرقم الوظيفي مستخدم مسبقاً' }, { status: 409 })
   }
 
-  // إنشاء مستخدم وهمي في auth لربط البروفايل (أو بروفايل بدون auth)
-  // نستخدم insert مباشر مع id عشوائي للموظفين بدون حساب دخول
-  const id = crypto.randomUUID()
+  const empNo = String(employee_number).trim()
+  const email = `emp${empNo}@cafestaff.local`
+  const password = `Emp${empNo}!${pin_code || '0000'}`
 
-  const { data, error } = await db.from('profiles').insert({
-    id,
+  const { data: authData, error: authError } = await db.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+    user_metadata: { full_name: String(full_name).trim(), role: 'employee' },
+  })
+
+  if (authError || !authData.user) {
+    return NextResponse.json({ error: authError?.message || 'فشل إنشاء الحساب' }, { status: 500 })
+  }
+
+  // التريغر ينشئ بروفايل أساسي — نحدّثه بالبيانات الكاملة
+  const { data, error } = await db.from('profiles').update({
     full_name: String(full_name).trim(),
-    employee_number: String(employee_number).trim(),
+    employee_number: empNo,
     salary_amount: Number(salary_amount) || 0,
     salary_type: 'monthly',
     hire_date: hire_date || null,
@@ -101,8 +112,11 @@ export async function POST(req: NextRequest) {
     pin_code: String(pin_code),
     role: 'employee',
     status: 'active',
-  }).select().single()
+  }).eq('id', authData.user.id).select().single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
   return NextResponse.json({ employee: data })
 }
