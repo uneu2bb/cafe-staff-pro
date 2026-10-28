@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import Link from 'next/link'
 
 type Employee = {
   id: string
@@ -27,9 +26,33 @@ type DayInfo = {
   worked_minutes: number | null
 }
 
+type DayRow = {
+  work_date: string
+  status: string
+  check_in_at: string | null
+  check_out_at: string | null
+  worked_minutes: number | null
+  net_worked_minutes: number | null
+}
+
 function fmtTime(iso: string | null) {
   if (!iso) return '—'
   return new Date(iso).toLocaleTimeString('ar-SY', { hour: '2-digit', minute: '2-digit', hour12: false })
+}
+
+function fmtDate(d: string) {
+  return new Date(d + 'T12:00:00').toLocaleDateString('ar-SY', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  })
+}
+
+function minsLabel(m: number | null | undefined) {
+  if (m == null || m === 0) return '—'
+  const h = Math.floor(m / 60)
+  const min = m % 60
+  return `${h}:${String(min).padStart(2, '0')}`
 }
 
 function statusMeta(s: string) {
@@ -55,6 +78,12 @@ export default function HomeBoard({ adminName, adminRole }: { adminName: string;
   const [search, setSearch] = useState('')
   const [showAdd, setShowAdd] = useState(false)
   const [selected, setSelected] = useState<Employee | null>(null)
+  const [reportRows, setReportRows] = useState<DayRow[]>([])
+  const [reportLoading, setReportLoading] = useState(false)
+  const [reportMonth, setReportMonth] = useState(() => {
+    const n = new Date()
+    return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}`
+  })
   const [form, setForm] = useState({
     full_name: '',
     employee_number: '',
@@ -81,7 +110,6 @@ export default function HomeBoard({ adminName, adminRole }: { adminName: string;
       if (!res.ok) throw new Error(data.error || 'فشل التحميل')
       setEmployees(data.employees || [])
 
-      // حالة اليوم من supabase مباشرة
       const supabase = createClient()
       const today = new Date().toISOString().slice(0, 10)
       const { data: days } = await supabase
@@ -111,6 +139,98 @@ export default function HomeBoard({ adminName, adminRole }: { adminName: string;
   useEffect(() => {
     load()
   }, [load])
+
+  const openReport = async (emp: Employee, month = reportMonth) => {
+    setSelected(emp)
+    setReportLoading(true)
+    setReportRows([])
+    try {
+      const [y, m] = month.split('-').map(Number)
+      const from = `${month}-01`
+      const lastDay = new Date(y, m, 0).getDate()
+      const to = `${month}-${String(lastDay).padStart(2, '0')}`
+
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('daily_attendance')
+        .select('work_date, status, check_in_at, check_out_at, worked_minutes, net_worked_minutes')
+        .eq('employee_id', emp.id)
+        .gte('work_date', from)
+        .lte('work_date', to)
+        .order('work_date', { ascending: false })
+
+      setReportRows((data || []) as DayRow[])
+    } catch {
+      showToast(false, 'فشل تحميل التقرير')
+    }
+    setReportLoading(false)
+  }
+
+  const reportStats = useMemo(() => {
+    if (!selected) return null
+    const hoursPerDay = Number(selected.work_hours_per_day) || 8
+    const monthlySalary = Number(selected.salary_amount) || 0
+    // أيام العمل المتوقعة في الشهر (تقريبي 26 يوم عمل إذا عطلة جمعة وسبت)
+    const [y, m] = reportMonth.split('-').map(Number)
+    const daysInMonth = new Date(y, m, 0).getDate()
+    let expectedWorkDays = 0
+    for (let d = 1; d <= daysInMonth; d++) {
+      const wd = new Date(y, m - 1, d).getDay() // 0=أحد ... 5=جمعة 6=سبت
+      if (wd !== 5 && wd !== 6) expectedWorkDays++
+    }
+    if (expectedWorkDays < 1) expectedWorkDays = 26
+
+    const monthlyHours = expectedWorkDays * hoursPerDay
+    const hourlyRate = monthlyHours > 0 ? monthlySalary / monthlyHours : 0
+
+    let presentDays = 0
+    let absentDays = 0
+    let lateDays = 0
+    let incompleteDays = 0
+    let totalMinutes = 0
+
+    for (const r of reportRows) {
+      const mins = r.net_worked_minutes ?? r.worked_minutes ?? 0
+      if (r.status === 'absent') {
+        absentDays++
+      } else if (r.status === 'late') {
+        lateDays++
+        presentDays++
+        totalMinutes += mins
+      } else if (r.check_in_at && r.check_out_at) {
+        presentDays++
+        totalMinutes += mins
+      } else if (r.check_in_at && !r.check_out_at) {
+        incompleteDays++
+        totalMinutes += mins
+      } else if (r.status === 'present') {
+        presentDays++
+        totalMinutes += mins
+      }
+    }
+
+    const totalHours = totalMinutes / 60
+    const earnedByHours = totalHours * hourlyRate
+    // خصم الغياب بنسبة يوم من الراتب الشهري
+    const dayRate = monthlySalary / expectedWorkDays
+    const fixedWithDeductions = Math.max(0, monthlySalary - absentDays * dayRate)
+
+    return {
+      presentDays,
+      absentDays,
+      lateDays,
+      incompleteDays,
+      totalMinutes,
+      totalHours,
+      hourlyRate,
+      monthlySalary,
+      monthlyHours,
+      expectedWorkDays,
+      earnedByHours,
+      fixedWithDeductions,
+      dayRate,
+    }
+  }, [selected, reportRows, reportMonth])
 
   const stats = useMemo(() => {
     const active = employees.filter((e) => e.status === 'active')
@@ -149,6 +269,9 @@ export default function HomeBoard({ adminName, adminRole }: { adminName: string;
       } else {
         showToast(true, data.message || 'تم')
         await load()
+        if (selected?.id === employeeId) {
+          await openReport(selected, reportMonth)
+        }
       }
     } catch {
       showToast(false, 'خطأ في الاتصال')
@@ -176,15 +299,8 @@ export default function HomeBoard({ adminName, adminRole }: { adminName: string;
         showToast(true, 'تم إضافة الموظف')
         setShowAdd(false)
         setForm({
-          full_name: '',
-          employee_number: '',
-          salary_amount: '',
-          hire_date: '',
-          work_hours_per_day: '8',
-          job_title: '',
-          phone: '',
-          notes: '',
-          pin_code: '0000',
+          full_name: '', employee_number: '', salary_amount: '', hire_date: '',
+          work_hours_per_day: '8', job_title: '', phone: '', notes: '', pin_code: '0000',
         })
         await load()
       }
@@ -202,20 +318,15 @@ export default function HomeBoard({ adminName, adminRole }: { adminName: string;
 
   return (
     <div className="min-h-screen" style={{ background: 'linear-gradient(160deg, #0a0f0c 0%, #0a0a0a 40%, #12100a 100%)' }}>
-      {/* Toast */}
       {toast && (
         <div
           className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-2xl text-sm font-medium shadow-xl"
-          style={{
-            background: toast.ok ? 'rgba(16,185,129,0.95)' : 'rgba(220,38,38,0.95)',
-            color: '#fff',
-          }}
+          style={{ background: toast.ok ? 'rgba(16,185,129,0.95)' : 'rgba(220,38,38,0.95)', color: '#fff' }}
         >
           {toast.msg}
         </div>
       )}
 
-      {/* Header */}
       <header className="sticky top-0 z-20 border-b border-zinc-800/80" style={{ background: 'rgba(10,12,11,0.85)', backdropFilter: 'blur(16px)' }}>
         <div className="max-w-6xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -229,14 +340,12 @@ export default function HomeBoard({ adminName, adminRole }: { adminName: string;
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <button onClick={() => setShowAdd(true)} className="btn-primary text-sm px-4 py-2">+ موظف</button>
-            <Link href="/kiosk" className="btn-secondary text-sm" style={{ textDecoration: 'none' }}>شاشة الحضور</Link>
             <button onClick={logout} className="text-sm text-red-400 px-3 py-2 rounded-xl hover:bg-red-500/10">خروج</button>
           </div>
         </div>
       </header>
 
       <main className="max-w-6xl mx-auto px-4 py-6 space-y-6">
-        {/* Stats */}
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           {[
             { label: 'الموظفون', value: stats.total, c: '#6ee7b7' },
@@ -252,19 +361,11 @@ export default function HomeBoard({ adminName, adminRole }: { adminName: string;
           ))}
         </div>
 
-        {/* Search */}
         <div className="flex gap-3">
-          <input
-            className="input-field"
-            placeholder="بحث بالاسم أو الرقم الوظيفي..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            style={{ textAlign: 'right' }}
-          />
+          <input className="input-field" placeholder="بحث بالاسم أو الرقم الوظيفي..." value={search} onChange={(e) => setSearch(e.target.value)} style={{ textAlign: 'right' }} />
           <button onClick={load} className="btn-secondary shrink-0">تحديث</button>
         </div>
 
-        {/* Cards */}
         {loading ? (
           <div className="text-center py-20 text-zinc-500">جاري التحميل...</div>
         ) : !filtered.length ? (
@@ -281,69 +382,22 @@ export default function HomeBoard({ adminName, adminRole }: { adminName: string;
               return (
                 <div key={emp.id} className="card glass employee-card">
                   <div className="flex items-start justify-between gap-2 mb-3">
-                    <button
-                      onClick={() => setSelected(emp)}
-                      className="text-right flex-1"
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
-                    >
+                    <button onClick={() => openReport(emp)} className="text-right flex-1" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
                       <h3 className="font-bold text-white text-lg leading-tight">{emp.full_name}</h3>
-                      <p className="text-xs text-zinc-500 mt-0.5">
-                        #{emp.employee_number}
-                        {emp.job_title ? ` · ${emp.job_title}` : ''}
-                      </p>
+                      <p className="text-xs text-zinc-500 mt-0.5">#{emp.employee_number}{emp.job_title ? ` · ${emp.job_title}` : ''}</p>
                     </button>
-                    <span
-                      className="text-xs px-2.5 py-1 rounded-full font-medium shrink-0"
-                      style={{ background: st.bg, color: st.color, border: `1px solid ${st.color}33` }}
-                    >
-                      {st.label}
-                    </span>
+                    <span className="text-xs px-2.5 py-1 rounded-full font-medium shrink-0" style={{ background: st.bg, color: st.color, border: `1px solid ${st.color}33` }}>{st.label}</span>
                   </div>
-
                   <div className="grid grid-cols-2 gap-2 text-xs text-zinc-400 mb-4">
-                    <div>
-                      <span className="text-zinc-600">الراتب: </span>
-                      <span className="text-amber-400 font-medium">${Number(emp.salary_amount || 0).toFixed(0)}</span>
-                    </div>
-                    <div>
-                      <span className="text-zinc-600">دخول: </span>
-                      <span className="text-emerald-400 font-mono" dir="ltr">{fmtTime(day?.check_in_at || null)}</span>
-                    </div>
-                    <div>
-                      <span className="text-zinc-600">ساعات/يوم: </span>
-                      {emp.work_hours_per_day || 8}
-                    </div>
-                    <div>
-                      <span className="text-zinc-600">خروج: </span>
-                      <span className="text-red-400 font-mono" dir="ltr">{fmtTime(day?.check_out_at || null)}</span>
-                    </div>
+                    <div><span className="text-zinc-600">الراتب: </span><span className="text-amber-400 font-medium">${Number(emp.salary_amount || 0).toFixed(0)}</span></div>
+                    <div><span className="text-zinc-600">دخول: </span><span className="text-emerald-400 font-mono" dir="ltr">{fmtTime(day?.check_in_at || null)}</span></div>
+                    <div><span className="text-zinc-600">ساعات/يوم: </span>{emp.work_hours_per_day || 8}</div>
+                    <div><span className="text-zinc-600">خروج: </span><span className="text-red-400 font-mono" dir="ltr">{fmtTime(day?.check_out_at || null)}</span></div>
                   </div>
-
                   <div className="grid grid-cols-3 gap-2">
-                    <button
-                      disabled={busy}
-                      onClick={() => doAction(emp.id, 'check_in')}
-                      className="py-2.5 rounded-xl text-xs font-bold text-white"
-                      style={{ background: '#059669' }}
-                    >
-                      حضور
-                    </button>
-                    <button
-                      disabled={busy}
-                      onClick={() => doAction(emp.id, 'absent')}
-                      className="py-2.5 rounded-xl text-xs font-bold text-white"
-                      style={{ background: '#b45309' }}
-                    >
-                      غياب
-                    </button>
-                    <button
-                      disabled={busy}
-                      onClick={() => doAction(emp.id, 'check_out')}
-                      className="py-2.5 rounded-xl text-xs font-bold text-white"
-                      style={{ background: '#dc2626' }}
-                    >
-                      انصراف
-                    </button>
+                    <button disabled={busy} onClick={() => doAction(emp.id, 'check_in')} className="py-2.5 rounded-xl text-xs font-bold text-white" style={{ background: '#059669' }}>حضور</button>
+                    <button disabled={busy} onClick={() => doAction(emp.id, 'absent')} className="py-2.5 rounded-xl text-xs font-bold text-white" style={{ background: '#b45309' }}>غياب</button>
+                    <button disabled={busy} onClick={() => doAction(emp.id, 'check_out')} className="py-2.5 rounded-xl text-xs font-bold text-white" style={{ background: '#dc2626' }}>انصراف</button>
                   </div>
                 </div>
               )
@@ -352,7 +406,7 @@ export default function HomeBoard({ adminName, adminRole }: { adminName: string;
         )}
       </main>
 
-      {/* Add employee modal */}
+      {/* Add employee */}
       {showAdd && (
         <div className="modal-backdrop" onClick={() => setShowAdd(false)}>
           <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
@@ -388,13 +442,9 @@ export default function HomeBoard({ adminName, adminRole }: { adminName: string;
                   <input className="input-field" value={form.job_title} onChange={(e) => setForm({ ...form, job_title: e.target.value })} style={{ textAlign: 'right' }} />
                 </div>
                 <div>
-                  <label className="label">رمز PIN للحضور</label>
+                  <label className="label">رمز PIN</label>
                   <input className="input-field" value={form.pin_code} onChange={(e) => setForm({ ...form, pin_code: e.target.value })} dir="ltr" />
                 </div>
-              </div>
-              <div>
-                <label className="label">ملاحظات</label>
-                <input className="input-field" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} style={{ textAlign: 'right' }} />
               </div>
               <div className="flex gap-2 pt-2">
                 <button type="submit" disabled={saving} className="btn-primary flex-1">{saving ? 'جاري الحفظ...' : 'حفظ'}</button>
@@ -405,35 +455,97 @@ export default function HomeBoard({ adminName, adminRole }: { adminName: string;
         </div>
       )}
 
-      {/* Employee detail modal */}
+      {/* Full employee report */}
       {selected && (
         <div className="modal-backdrop" onClick={() => setSelected(null)}>
-          <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-bold text-white">{selected.full_name}</h2>
-            <p className="text-sm text-zinc-500 mb-4">#{selected.employee_number} · ${Number(selected.salary_amount || 0).toFixed(0)} / شهر</p>
-            <div className="grid grid-cols-2 gap-3 text-sm mb-4">
-              <div className="card" style={{ padding: 12 }}>
-                <p className="text-zinc-500 text-xs">ساعات يومية</p>
-                <p className="text-white font-bold">{selected.work_hours_per_day || 8}</p>
+          <div className="modal-panel" style={{ maxWidth: 520 }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between gap-2 mb-1">
+              <div>
+                <h2 className="text-lg font-bold text-white">{selected.full_name}</h2>
+                <p className="text-sm text-zinc-500">#{selected.employee_number} · ${Number(selected.salary_amount || 0).toFixed(0)} / شهر</p>
               </div>
-              <div className="card" style={{ padding: 12 }}>
-                <p className="text-zinc-500 text-xs">تاريخ البدء</p>
-                <p className="text-white font-bold">{selected.hire_date || '—'}</p>
-              </div>
-              <div className="card" style={{ padding: 12 }}>
-                <p className="text-zinc-500 text-xs">المسمى</p>
-                <p className="text-white font-bold">{selected.job_title || '—'}</p>
-              </div>
-              <div className="card" style={{ padding: 12 }}>
-                <p className="text-zinc-500 text-xs">PIN</p>
-                <p className="text-white font-bold font-mono" dir="ltr">{selected.pin_code || '—'}</p>
-              </div>
+              <button onClick={() => setSelected(null)} className="text-zinc-500 text-xl leading-none px-2">×</button>
             </div>
-            {selected.notes && <p className="text-sm text-zinc-400 mb-4">{selected.notes}</p>}
-            <div className="grid grid-cols-3 gap-2 mb-3">
-              <button onClick={() => { doAction(selected.id, 'check_in'); setSelected(null) }} className="py-3 rounded-xl text-sm font-bold text-white" style={{ background: '#059669' }}>حضور</button>
-              <button onClick={() => { doAction(selected.id, 'absent'); setSelected(null) }} className="py-3 rounded-xl text-sm font-bold text-white" style={{ background: '#b45309' }}>غياب</button>
-              <button onClick={() => { doAction(selected.id, 'check_out'); setSelected(null) }} className="py-3 rounded-xl text-sm font-bold text-white" style={{ background: '#dc2626' }}>انصراف</button>
+
+            <div className="mb-4">
+              <label className="label">الشهر</label>
+              <input
+                type="month"
+                className="input-field"
+                value={reportMonth}
+                dir="ltr"
+                onChange={(e) => {
+                  setReportMonth(e.target.value)
+                  openReport(selected, e.target.value)
+                }}
+              />
+            </div>
+
+            {reportLoading ? (
+              <p className="text-center text-zinc-500 py-8">جاري تحميل التقرير...</p>
+            ) : reportStats ? (
+              <>
+                <div className="grid grid-cols-2 gap-2 mb-4">
+                  <div className="card" style={{ padding: 12 }}>
+                    <p className="text-xs text-zinc-500">أيام الدوام</p>
+                    <p className="text-xl font-bold text-emerald-400">{reportStats.presentDays}</p>
+                  </div>
+                  <div className="card" style={{ padding: 12 }}>
+                    <p className="text-xs text-zinc-500">أيام الغياب</p>
+                    <p className="text-xl font-bold text-red-400">{reportStats.absentDays}</p>
+                  </div>
+                  <div className="card" style={{ padding: 12 }}>
+                    <p className="text-xs text-zinc-500">ساعات العمل</p>
+                    <p className="text-xl font-bold text-amber-400" dir="ltr">{reportStats.totalHours.toFixed(1)} س</p>
+                  </div>
+                  <div className="card" style={{ padding: 12 }}>
+                    <p className="text-xs text-zinc-500">دوام غير مكتمل</p>
+                    <p className="text-xl font-bold text-orange-400">{reportStats.incompleteDays}</p>
+                  </div>
+                </div>
+
+                <div className="card mb-4" style={{ padding: 14, borderColor: 'rgba(217,119,6,0.35)' }}>
+                  <p className="text-xs text-zinc-500 mb-2">حساب الراتب — {reportMonth}</p>
+                  <div className="space-y-1.5 text-sm">
+                    <div className="flex justify-between"><span className="text-zinc-400">الراتب الشهري الأساسي</span><span className="text-white font-medium">${reportStats.monthlySalary.toFixed(2)}</span></div>
+                    <div className="flex justify-between"><span className="text-zinc-400">أيام العمل المتوقعة</span><span className="text-zinc-200">{reportStats.expectedWorkDays} يوم</span></div>
+                    <div className="flex justify-between"><span className="text-zinc-400">أجر الساعة</span><span className="text-zinc-200">${reportStats.hourlyRate.toFixed(2)}</span></div>
+                    <div className="flex justify-between"><span className="text-zinc-400">أجر اليوم</span><span className="text-zinc-200">${reportStats.dayRate.toFixed(2)}</span></div>
+                    <div className="border-t border-zinc-700 my-2" />
+                    <div className="flex justify-between"><span className="text-zinc-400">مستحق حسب الساعات</span><span className="text-emerald-400 font-bold">${reportStats.earnedByHours.toFixed(2)}</span></div>
+                    <div className="flex justify-between"><span className="text-zinc-400">راتب ثابت − خصم الغياب</span><span className="text-amber-400 font-bold">${reportStats.fixedWithDeductions.toFixed(2)}</span></div>
+                  </div>
+                </div>
+
+                <p className="text-xs text-zinc-500 mb-2">التفاصيل اليومية</p>
+                {!reportRows.length ? (
+                  <p className="text-center text-zinc-600 text-sm py-6">لا سجلات لهذا الشهر</p>
+                ) : (
+                  <div className="max-h-48 overflow-y-auto space-y-1.5 mb-4">
+                    {reportRows.map((r) => {
+                      const st = statusMeta(
+                        r.check_in_at && r.check_out_at ? 'checked_out' : r.status || 'none'
+                      )
+                      return (
+                        <div key={r.work_date} className="flex items-center gap-2 text-xs rounded-xl px-3 py-2" style={{ background: '#09090b', border: '1px solid #27272a' }}>
+                          <span className="text-zinc-300 w-20 shrink-0">{fmtDate(r.work_date)}</span>
+                          <span className="font-mono text-emerald-400" dir="ltr">{fmtTime(r.check_in_at)}</span>
+                          <span className="text-zinc-600">-</span>
+                          <span className="font-mono text-red-400" dir="ltr">{fmtTime(r.check_out_at)}</span>
+                          <span className="text-zinc-400 font-mono mr-auto" dir="ltr">{minsLabel(r.net_worked_minutes ?? r.worked_minutes)}</span>
+                          <span className="px-2 py-0.5 rounded-full" style={{ background: st.bg, color: st.color }}>{st.label}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </>
+            ) : null}
+
+            <div className="grid grid-cols-3 gap-2 mb-2">
+              <button onClick={() => doAction(selected.id, 'check_in')} className="py-3 rounded-xl text-sm font-bold text-white" style={{ background: '#059669' }}>حضور</button>
+              <button onClick={() => doAction(selected.id, 'absent')} className="py-3 rounded-xl text-sm font-bold text-white" style={{ background: '#b45309' }}>غياب</button>
+              <button onClick={() => doAction(selected.id, 'check_out')} className="py-3 rounded-xl text-sm font-bold text-white" style={{ background: '#dc2626' }}>انصراف</button>
             </div>
             <button onClick={() => setSelected(null)} className="btn-secondary w-full">إغلاق</button>
           </div>
