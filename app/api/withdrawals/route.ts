@@ -1,107 +1,60 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
-
-function adminDb() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
-}
-
-async function requireAdmin() {
-  const cookieStore = await cookies()
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { getAll: () => cookieStore.getAll(), setAll: () => {} } }
-  )
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
-  const db = adminDb()
-  const { data: profile } = await db.from('profiles').select('role').eq('id', user.id).single()
-  if (!profile || !['owner', 'manager', 'accountant'].includes(profile.role)) return null
-  return user
-}
+import { adminDb, requireTenant } from '@/lib/tenant'
 
 export async function GET(req: NextRequest) {
-  const user = await requireAdmin()
-  if (!user) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 })
+  const ctx = await requireTenant(['owner', 'manager', 'accountant'])
+  if (!ctx) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 })
 
-  const db = adminDb()
   const employeeId = req.nextUrl.searchParams.get('employee_id')
-
+  const db = adminDb()
   let q = db
     .from('employee_withdrawals')
-    .select('id, employee_id, amount, currency, note, withdrawn_at, profiles:employee_id(full_name, employee_number)')
+    .select('id, employee_id, amount, currency, note, withdrawn_at')
+    .eq('tenant_id', ctx.tenantId)
     .order('withdrawn_at', { ascending: false })
-    .limit(200)
+    .limit(100)
 
   if (employeeId) q = q.eq('employee_id', employeeId)
 
   const { data, error } = await q
-  if (error) {
-    // الجدول غير موجود بعد
-    if (error.message?.includes('employee_withdrawals') || error.code === 'PGRST205') {
-      return NextResponse.json({ withdrawals: [], need_migration: true })
-    }
-    return NextResponse.json({ error: error.message }, { status: 500 })
-  }
-
-  const { data: settings } = await db.from('system_settings').select('key, value')
-  const rates: Record<string, number> = { USD: 1, SYP: 15000, TRY: 34 }
-  for (const s of settings || []) {
-    if (s.key === 'rate_syp_per_usd') rates.SYP = Number(s.value) || 15000
-    if (s.key === 'rate_try_per_usd') rates.TRY = Number(s.value) || 34
-  }
-
-  let totalUsd = 0
-  let sumUsd = 0, sumSyp = 0, sumTry = 0
-  for (const w of data || []) {
-    const amt = Number(w.amount) || 0
-    if (w.currency === 'USD') { sumUsd += amt; totalUsd += amt }
-    else if (w.currency === 'SYP') { sumSyp += amt; totalUsd += amt / rates.SYP }
-    else if (w.currency === 'TRY') { sumTry += amt; totalUsd += amt / rates.TRY }
-  }
-
-  return NextResponse.json({
-    withdrawals: data || [],
-    rates,
-    totals: { USD: sumUsd, SYP: sumSyp, TRY: sumTry, total_usd: totalUsd },
-  })
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ withdrawals: data || [] })
 }
 
 export async function POST(req: NextRequest) {
-  const user = await requireAdmin()
-  if (!user) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 })
+  const ctx = await requireTenant(['owner', 'manager', 'accountant'])
+  if (!ctx) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 })
 
   const body = await req.json()
-  const { employee_id, amount, currency, note } = body
+  const { employee_id, amount, currency = 'USD', note } = body
 
-  if (!employee_id || !amount || !['USD', 'SYP', 'TRY'].includes(currency)) {
-    return NextResponse.json({ error: 'بيانات غير مكتملة' }, { status: 400 })
+  if (!employee_id || !amount) {
+    return NextResponse.json({ error: 'الموظف والمبلغ مطلوبان' }, { status: 400 })
   }
 
   const db = adminDb()
-  const { data, error } = await db.from('employee_withdrawals').insert({
-    employee_id,
-    amount: Number(amount),
-    currency,
-    note: note || null,
-    created_by: user.id,
-  }).select().single()
+  const { data: emp } = await db
+    .from('profiles')
+    .select('id')
+    .eq('id', employee_id)
+    .eq('tenant_id', ctx.tenantId)
+    .single()
 
-  if (error) {
-    if (error.message?.includes('employee_withdrawals') || error.code === 'PGRST205') {
-      return NextResponse.json({
-        error: 'يجب تنفيذ SQL لإنشاء جدول السحوبات أولاً (ملف supabase/withdrawals.sql)',
-        need_migration: true,
-      }, { status: 400 })
-    }
-    return NextResponse.json({ error: error.message }, { status: 500 })
-  }
+  if (!emp) return NextResponse.json({ error: 'موظف غير موجود في مقهاك' }, { status: 404 })
 
-  return NextResponse.json({ withdrawal: data })
+  const { data, error } = await db
+    .from('employee_withdrawals')
+    .insert({
+      employee_id,
+      tenant_id: ctx.tenantId,
+      amount: Number(amount),
+      currency,
+      note: note || null,
+      created_by: ctx.userId,
+    })
+    .select()
+    .single()
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ success: true, withdrawal: data })
 }

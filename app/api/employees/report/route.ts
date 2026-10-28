@@ -1,34 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
-
-function adminDb() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
-}
-
-async function requireAdmin() {
-  const cookieStore = await cookies()
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { getAll: () => cookieStore.getAll(), setAll: () => {} } }
-  )
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
-  const db = adminDb()
-  const { data: profile } = await db.from('profiles').select('role').eq('id', user.id).single()
-  if (!profile || !['owner', 'manager', 'accountant'].includes(profile.role)) return null
-  return user
-}
+import { adminDb, requireTenant } from '@/lib/tenant'
 
 export async function GET(req: NextRequest) {
-  const user = await requireAdmin()
-  if (!user) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 })
+  const ctx = await requireTenant(['owner', 'manager', 'accountant'])
+  if (!ctx) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 })
 
   const employeeId = req.nextUrl.searchParams.get('employee_id')
   const month = req.nextUrl.searchParams.get('month')
@@ -39,8 +14,9 @@ export async function GET(req: NextRequest) {
   const db = adminDb()
   const { data: emp } = await db
     .from('profiles')
-    .select('id, full_name, employee_number, salary_amount, work_hours_per_day')
+    .select('id, full_name, employee_number, salary_amount, work_hours_per_day, tenant_id')
     .eq('id', employeeId)
+    .eq('tenant_id', ctx.tenantId)
     .single()
 
   if (!emp) return NextResponse.json({ error: 'موظف غير موجود' }, { status: 404 })
@@ -54,27 +30,34 @@ export async function GET(req: NextRequest) {
     .from('daily_attendance')
     .select('work_date, status, check_in_at, check_out_at, worked_minutes, net_worked_minutes')
     .eq('employee_id', employeeId)
+    .eq('tenant_id', ctx.tenantId)
     .gte('work_date', from)
     .lte('work_date', to)
     .order('work_date', { ascending: false })
 
   const hoursPerDay = Number(emp.work_hours_per_day) || 8
   const monthlySalary = Number(emp.salary_amount) || 0
-
-  // اليومية = الراتب ÷ 30
-  // أجر الساعة = اليومية ÷ ساعات اليوم
-  // إجمالي أجر الساعات = ساعات الدوام × أجر الساعة
   const expectedWorkDays = 30
   const dayRate = monthlySalary / expectedWorkDays
   const hourlyRate = hoursPerDay > 0 ? dayRate / hoursPerDay : 0
 
-  let presentDays = 0, absentDays = 0, incompleteDays = 0, totalMinutes = 0
+  let presentDays = 0,
+    absentDays = 0,
+    incompleteDays = 0,
+    totalMinutes = 0
   for (const r of days || []) {
     const mins = r.net_worked_minutes ?? r.worked_minutes ?? 0
     if (r.status === 'absent') absentDays++
-    else if (r.check_in_at && r.check_out_at) { presentDays++; totalMinutes += mins }
-    else if (r.check_in_at && !r.check_out_at) { incompleteDays++; totalMinutes += mins }
-    else if (r.status === 'present' || r.status === 'late') { presentDays++; totalMinutes += mins }
+    else if (r.check_in_at && r.check_out_at) {
+      presentDays++
+      totalMinutes += mins
+    } else if (r.check_in_at && !r.check_out_at) {
+      incompleteDays++
+      totalMinutes += mins
+    } else if (r.status === 'present' || r.status === 'late') {
+      presentDays++
+      totalMinutes += mins
+    }
   }
 
   const totalHours = totalMinutes / 60
@@ -83,8 +66,11 @@ export async function GET(req: NextRequest) {
 
   let withdrawnUsd = 0
   const withdrawalList: { amount: number; currency: string; note: string | null; withdrawn_at: string }[] = []
-  const { data: settings } = await db.from('system_settings').select('key, value')
   const rates = { SYP: 15000, TRY: 34 }
+  const { data: settings } = await db
+    .from('system_settings')
+    .select('key, value')
+    .eq('tenant_id', ctx.tenantId)
   for (const s of settings || []) {
     if (s.key === 'rate_syp_per_usd') rates.SYP = Number(s.value) || 15000
     if (s.key === 'rate_try_per_usd') rates.TRY = Number(s.value) || 34
@@ -94,6 +80,7 @@ export async function GET(req: NextRequest) {
     .from('employee_withdrawals')
     .select('amount, currency, note, withdrawn_at')
     .eq('employee_id', employeeId)
+    .eq('tenant_id', ctx.tenantId)
     .gte('withdrawn_at', from + 'T00:00:00')
     .lte('withdrawn_at', to + 'T23:59:59')
     .order('withdrawn_at', { ascending: false })
