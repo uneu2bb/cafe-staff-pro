@@ -1,4 +1,5 @@
 import { createServerClient } from '@supabase/ssr'
+import type { CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function updateSession(request: NextRequest) {
@@ -12,23 +13,48 @@ export async function updateSession(request: NextRequest) {
         getAll() {
           return request.cookies.getAll()
         },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
+
+        setAll(
+          cookiesToSet: {
+            name: string
+            value: string
+            options?: CookieOptions
+          }[]
+        ) {
+          cookiesToSet.forEach(({ name, value }) => {
+            request.cookies.set(name, value)
+          })
+
           supabaseResponse = NextResponse.next({ request })
-          cookiesToSet.forEach(({ name, value, options }) =>
+
+          cookiesToSet.forEach(({ name, value, options }) => {
             supabaseResponse.cookies.set(name, value, options)
-          )
+          })
         },
       },
     }
   )
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
-  const publicPaths = ['/login', '/setup', '/kiosk', '/api/attendance']
-  const isPublic = publicPaths.some((path) => request.nextUrl.pathname.startsWith(path))
+  const publicPaths = [
+    '/login',
+    '/setup',
+    '/kiosk',
+    '/api/attendance',
+  ]
 
-  if (!user && !isPublic && request.nextUrl.pathname !== '/') {
+  const isPublic = publicPaths.some((path) =>
+    request.nextUrl.pathname.startsWith(path)
+  )
+
+  if (
+    !user &&
+    !isPublic &&
+    request.nextUrl.pathname !== '/'
+  ) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
