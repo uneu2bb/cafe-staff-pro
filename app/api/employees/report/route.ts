@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 })
 
   const employeeId = req.nextUrl.searchParams.get('employee_id')
-  const month = req.nextUrl.searchParams.get('month') // YYYY-MM
+  const month = req.nextUrl.searchParams.get('month')
   if (!employeeId || !month) {
     return NextResponse.json({ error: 'employee_id و month مطلوبان' }, { status: 400 })
   }
@@ -62,8 +62,8 @@ export async function GET(req: NextRequest) {
   const monthlySalary = Number(emp.salary_amount) || 0
 
   // اليومية = الراتب ÷ 30
-  // أجر الساعة = اليومية ÷ ساعات اليوم المحددة
-  // إجمالي أجر الساعات = ساعات الدوام الفعلية × أجر الساعة
+  // أجر الساعة = اليومية ÷ ساعات اليوم
+  // إجمالي أجر الساعات = ساعات الدوام × أجر الساعة
   const expectedWorkDays = 30
   const dayRate = monthlySalary / expectedWorkDays
   const hourlyRate = hoursPerDay > 0 ? dayRate / hoursPerDay : 0
@@ -106,9 +106,7 @@ export async function GET(req: NextRequest) {
     else if (w.currency === 'TRY') withdrawnUsd += amt / rates.TRY
   }
 
-  // الصافي حسب أجر الساعات − السحوبات
   const net = Math.max(0, earnedByHours - withdrawnUsd)
-  // صافي الراتب الثابت (بعد غياب وسحوبات) كمرجع
   const netFixed = Math.max(0, fixedWithDeductions - withdrawnUsd)
 
   return NextResponse.json({
