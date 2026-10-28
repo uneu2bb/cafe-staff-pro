@@ -60,12 +60,11 @@ export async function GET(req: NextRequest) {
 
   const hoursPerDay = Number(emp.work_hours_per_day) || 8
   const monthlySalary = Number(emp.salary_amount) || 0
-  let expectedWorkDays = 0
-  for (let d = 1; d <= lastDay; d++) {
-    const wd = new Date(y, m - 1, d).getDay()
-    if (wd !== 5 && wd !== 6) expectedWorkDays++
-  }
-  if (expectedWorkDays < 1) expectedWorkDays = 26
+
+  // أساس الحساب: 30 يوم عمل في الشهر (راتب يومي = الراتب ÷ 30)
+  const expectedWorkDays = 30
+  const dayRate = monthlySalary / expectedWorkDays
+  const hourlyRate = hoursPerDay > 0 ? dayRate / hoursPerDay : 0
 
   let presentDays = 0, absentDays = 0, incompleteDays = 0, totalMinutes = 0
   for (const r of days || []) {
@@ -77,10 +76,8 @@ export async function GET(req: NextRequest) {
   }
 
   const totalHours = totalMinutes / 60
-  const dayRate = monthlySalary / expectedWorkDays
   const fixedWithDeductions = Math.max(0, monthlySalary - absentDays * dayRate)
 
-  // سحوبات الشهر
   let withdrawnUsd = 0
   const withdrawalList: { amount: number; currency: string; note: string | null; withdrawn_at: string }[] = []
   const { data: settings } = await db.from('system_settings').select('key, value')
@@ -121,6 +118,8 @@ export async function GET(req: NextRequest) {
       monthlySalary,
       expectedWorkDays,
       dayRate,
+      hourlyRate,
+      hoursPerDay,
       fixedWithDeductions,
       withdrawnUsd,
       net,
