@@ -14,11 +14,16 @@ export async function GET() {
   const map: Record<string, string> = {}
   for (const s of settings || []) map[s.key] = s.value
 
-  // إيميل المالك من Auth
   const { data: userData } = await db.auth.admin.getUserById(ctx.userId)
+  const { data: tenant } = await db
+    .from('tenants')
+    .select('id, name')
+    .eq('id', ctx.tenantId)
+    .single()
 
   return NextResponse.json({
     email: userData?.user?.email || '',
+    cafe_name: tenant?.name || '',
     rate_syp_per_usd: map.rate_syp_per_usd || '15000',
     rate_try_per_usd: map.rate_try_per_usd || '34',
     tenantId: ctx.tenantId,
@@ -46,6 +51,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'كلمة المرور غير صحيحة' }, { status: 403 })
     }
     return NextResponse.json({ success: true })
+  }
+
+  if (action === 'update_cafe_name') {
+    const name = String(body.cafe_name || body.name || '').trim()
+    if (!name || name.length < 2) {
+      return NextResponse.json({ error: 'اسم الكافيه قصير جداً' }, { status: 400 })
+    }
+    if (name.length > 80) {
+      return NextResponse.json({ error: 'اسم الكافيه طويل جداً' }, { status: 400 })
+    }
+    // فقط المالك يعدّل الاسم
+    if (ctx.role !== 'owner' && ctx.role !== 'manager') {
+      return NextResponse.json({ error: 'غير مصرح' }, { status: 403 })
+    }
+    const { error } = await db
+      .from('tenants')
+      .update({ name, updated_at: new Date().toISOString() })
+      .eq('id', ctx.tenantId)
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ success: true, cafe_name: name })
   }
 
   if (action === 'update_panel_password') {
