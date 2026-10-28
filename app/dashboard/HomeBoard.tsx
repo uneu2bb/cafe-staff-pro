@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import ReportModal from './ReportModal'
+import TenantsTab from './TenantsTab'
 
 type Employee = {
   id: string
@@ -68,7 +69,7 @@ export default function HomeBoard({ adminName, adminRole }: { adminName: string;
   const [showPanelGate, setShowPanelGate] = useState(false)
   const [panelOpen, setPanelOpen] = useState(false)
   const [panelPwd, setPanelPwd] = useState('')
-  const [panelTab, setPanelTab] = useState<'account' | 'rates' | 'withdrawals' | 'employees'>('employees')
+  const [panelTab, setPanelTab] = useState<'account' | 'rates' | 'withdrawals' | 'employees' | 'cafes'>('employees')
   const [panelBusy, setPanelBusy] = useState(false)
   const [newEmail, setNewEmail] = useState('')
   const [newPanelPwd, setNewPanelPwd] = useState('')
@@ -411,7 +412,7 @@ export default function HomeBoard({ adminName, adminRole }: { adminName: string;
           <div className="modal-panel" style={{ maxWidth: 520, maxHeight: '92vh' }} onClick={(e) => e.stopPropagation()}>
             <h2 className="text-lg font-bold text-white mb-3">لوحة التحكم</h2>
             <div className="flex gap-1.5 mb-4 flex-wrap">
-              {([['employees', 'الموظفون'], ['withdrawals', 'السحوبات'], ['rates', 'الصرف'], ['account', 'الحساب']] as const).map(([id, label]) => (
+              {([['employees', 'الموظفون'], ['cafes', 'الحسابات'], ['withdrawals', 'السحوبات'], ['rates', 'الصرف'], ['account', 'الحساب']] as const).map(([id, label]) => (
                 <button key={id} onClick={() => setPanelTab(id)} className="px-2.5 py-1.5 rounded-xl text-xs" style={{ background: panelTab === id ? 'rgba(5,150,105,0.25)' : '#27272a', color: panelTab === id ? '#6ee7b7' : '#a1a1aa', border: 'none' }}>{label}</button>
               ))}
             </div>
@@ -427,6 +428,9 @@ export default function HomeBoard({ adminName, adminRole }: { adminName: string;
                   </div>
                 ))}
               </div>
+            )}
+            {panelTab === 'cafes' && (
+              <TenantsTab onToast={showToast} />
             )}
             {panelTab === 'withdrawals' && (
               <div className="space-y-3">
