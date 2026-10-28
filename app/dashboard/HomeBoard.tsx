@@ -72,6 +72,7 @@ export default function HomeBoard({ adminName, adminRole }: { adminName: string;
   const [panelTab, setPanelTab] = useState<'account' | 'rates' | 'withdrawals' | 'employees' | 'cafes'>('employees')
   const [panelBusy, setPanelBusy] = useState(false)
   const [newEmail, setNewEmail] = useState('')
+  const [cafeName, setCafeName] = useState('')
   const [newPanelPwd, setNewPanelPwd] = useState('')
   const [rateSyp, setRateSyp] = useState('15000')
   const [rateTry, setRateTry] = useState('34')
@@ -239,7 +240,7 @@ export default function HomeBoard({ adminName, adminRole }: { adminName: string;
       else {
         setShowPanelGate(false); setPanelOpen(true)
         const s = await fetch('/api/admin/settings').then((r) => r.json())
-        setNewEmail(s.email || ''); setRateSyp(s.rate_syp_per_usd || '15000'); setRateTry(s.rate_try_per_usd || '34')
+        setNewEmail(s.email || ''); setCafeName(s.cafe_name || ''); setRateSyp(s.rate_syp_per_usd || '15000'); setRateTry(s.rate_try_per_usd || '34')
       }
     } catch { showToast(false, 'خطأ') }
     setPanelBusy(false)
@@ -387,14 +388,7 @@ export default function HomeBoard({ adminName, adminRole }: { adminName: string;
       )}
 
       {(fullReport || reportLoading) && (
-        <ReportModal
-          fullReport={fullReport}
-          reportLoading={reportLoading}
-          reportMonth={reportMonth}
-          setReportMonth={setReportMonth}
-          generateReport={generateReport}
-          onClose={() => setFullReport(null)}
-        />
+        <ReportModal fullReport={fullReport} reportLoading={reportLoading} reportMonth={reportMonth} setReportMonth={setReportMonth} generateReport={generateReport} onClose={() => setFullReport(null)} />
       )}
 
       {showPanelGate && (
@@ -429,9 +423,7 @@ export default function HomeBoard({ adminName, adminRole }: { adminName: string;
                 ))}
               </div>
             )}
-            {panelTab === 'cafes' && (
-              <TenantsTab onToast={showToast} />
-            )}
+            {panelTab === 'cafes' && (<TenantsTab onToast={showToast} />)}
             {panelTab === 'withdrawals' && (
               <div className="space-y-3">
                 <select className="input-field" value={wForm.employee_id} onChange={(e) => setWForm({ ...wForm, employee_id: e.target.value })} style={{ textAlign: 'right' }}>
@@ -466,6 +458,8 @@ export default function HomeBoard({ adminName, adminRole }: { adminName: string;
             )}
             {panelTab === 'account' && (
               <div className="space-y-3">
+                <div><label className="label">اسم الكافيه</label><input className="input-field" value={cafeName} onChange={(e) => setCafeName(e.target.value)} style={{ textAlign: 'right' }} placeholder="اسم المقهى" />
+                  <button className="btn-secondary w-full mt-2 text-sm" onClick={async () => { const res = await fetch('/api/admin/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'update_cafe_name', cafe_name: cafeName }) }); const d = await res.json(); showToast(res.ok, res.ok ? 'تم تغيير الاسم' : d.error) }}>حفظ الاسم</button></div>
                 <div><label className="label">البريد</label><input className="input-field" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} dir="ltr" style={{ textAlign: 'left' }} />
                   <button className="btn-secondary w-full mt-2 text-sm" onClick={async () => { const res = await fetch('/api/admin/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'update_email', email: newEmail }) }); const d = await res.json(); showToast(res.ok, res.ok ? 'تم' : d.error) }}>حفظ</button></div>
                 <div><label className="label">كلمة مرور اللوحة</label><input type="password" className="input-field" value={newPanelPwd} onChange={(e) => setNewPanelPwd(e.target.value)} dir="ltr" />
