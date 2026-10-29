@@ -20,6 +20,7 @@ export default function TenantsTab({ onToast }: { onToast: (ok: boolean, msg: st
   const [editTarget, setEditTarget] = useState<TenantRow | null>(null)
   const [editEmail, setEditEmail] = useState('')
   const [editPassword, setEditPassword] = useState('')
+  const [editCafeName, setEditCafeName] = useState('')
   const [editBusy, setEditBusy] = useState(false)
 
   const load = useCallback(async () => {
@@ -71,6 +72,29 @@ export default function TenantsTab({ onToast }: { onToast: (ok: boolean, msg: st
     setEditTarget(t)
     setEditEmail(t.owner_email || '')
     setEditPassword('')
+    setEditCafeName(t.name || '')
+  }
+
+  const saveCafeName = async () => {
+    if (!editTarget) return
+    setEditBusy(true)
+    try {
+      const res = await fetch('/api/super-admin/tenants', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tenant_id: editTarget.id, action: 'set_cafe_name', cafe_name: editCafeName }),
+      })
+      const data = await res.json()
+      if (!res.ok) onToast(false, data.error || 'فشل')
+      else {
+        onToast(true, data.message || 'تم')
+        await load()
+        setEditTarget((prev) => (prev ? { ...prev, name: editCafeName.trim() } : null))
+      }
+    } catch {
+      onToast(false, 'خطأ اتصال')
+    }
+    setEditBusy(false)
   }
 
   const saveEmail = async () => {
@@ -159,14 +183,14 @@ export default function TenantsTab({ onToast }: { onToast: (ok: boolean, msg: st
                   border: '1px solid rgba(59,130,246,0.35)',
                 }}
               >
-                بريد / كلمة سر
+                تعديل الحساب
               </button>
               {active ? (
                 <button
                   disabled={busyId === t.id}
                   onClick={() => act(t.id, 'suspend', t.name)}
                   className="text-xs px-2.5 py-1.5 rounded-lg"
- style={{
+                  style={{
                     background: 'rgba(245,158,11,0.15)',
                     color: '#fcd34d',
                     border: '1px solid rgba(245,158,11,0.35)',
@@ -220,6 +244,19 @@ export default function TenantsTab({ onToast }: { onToast: (ok: boolean, msg: st
             <p className="text-xs text-zinc-500">{editTarget.owner_name || 'المالك'}</p>
 
             <div>
+              <label className="label">اسم المقهى / الموقع</label>
+              <input
+                className="input-field"
+                value={editCafeName}
+                onChange={(e) => setEditCafeName(e.target.value)}
+                style={{ textAlign: 'right' }}
+              />
+              <button disabled={editBusy} onClick={saveCafeName} className="btn-secondary w-full mt-2 text-sm">
+                حفظ الاسم
+              </button>
+            </div>
+
+            <div>
               <label className="label">البريد</label>
               <input
                 className="input-field"
@@ -228,11 +265,7 @@ export default function TenantsTab({ onToast }: { onToast: (ok: boolean, msg: st
                 dir="ltr"
                 style={{ textAlign: 'left' }}
               />
-              <button
-                disabled={editBusy}
-                onClick={saveEmail}
-                className="btn-secondary w-full mt-2 text-sm"
-              >
+              <button disabled={editBusy} onClick={saveEmail} className="btn-secondary w-full mt-2 text-sm">
                 حفظ البريد
               </button>
             </div>
