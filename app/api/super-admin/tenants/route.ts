@@ -53,10 +53,11 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json()
   const { action, tenant_id } = body as {
-    action: 'suspend' | 'activate' | 'delete' | 'set_email' | 'set_password'
+    action: 'suspend' | 'activate' | 'delete' | 'set_email' | 'set_password' | 'set_cafe_name'
     tenant_id: string
     email?: string
     password?: string
+    cafe_name?: string
   }
 
   if (!tenant_id || !action) {
@@ -81,6 +82,22 @@ export async function POST(req: NextRequest) {
   if (action === 'activate') {
     await db.from('tenants').update({ status: 'active', updated_at: new Date().toISOString() }).eq('id', tenant_id)
     return NextResponse.json({ success: true, message: `تم تفعيل «${tenant.name}»` })
+  }
+
+  if (action === 'set_cafe_name') {
+    const name = String(body.cafe_name || '').trim()
+    if (!name || name.length < 2) {
+      return NextResponse.json({ error: 'اسم قصير جداً' }, { status: 400 })
+    }
+    if (name.length > 80) {
+      return NextResponse.json({ error: 'اسم طويل جداً' }, { status: 400 })
+    }
+    const { error } = await db
+      .from('tenants')
+      .update({ name, updated_at: new Date().toISOString() })
+      .eq('id', tenant_id)
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ success: true, message: `تم تغيير اسم المقهى إلى «${name}»` })
   }
 
   if (action === 'set_email') {
