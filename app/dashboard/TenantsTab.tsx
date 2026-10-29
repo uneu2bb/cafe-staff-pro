@@ -22,6 +22,14 @@ export default function TenantsTab({ onToast }: { onToast: (ok: boolean, msg: st
   const [editPassword, setEditPassword] = useState('')
   const [editCafeName, setEditCafeName] = useState('')
   const [editBusy, setEditBusy] = useState(false)
+  const [showCreate, setShowCreate] = useState(false)
+  const [createForm, setCreateForm] = useState({
+    cafeName: '',
+    ownerName: '',
+    email: '',
+    password: '',
+  })
+  const [createBusy, setCreateBusy] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -140,6 +148,36 @@ export default function TenantsTab({ onToast }: { onToast: (ok: boolean, msg: st
     setEditBusy(false)
   }
 
+  const createAccount = async () => {
+    if (!createForm.cafeName.trim() || !createForm.email.trim() || !createForm.password.trim()) {
+      onToast(false, 'أكمل الحقول المطلوبة')
+      return
+    }
+    if (createForm.password.length < 6) {
+      onToast(false, 'كلمة المرور 6 أحرف على الأقل')
+      return
+    }
+    setCreateBusy(true)
+    try {
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(createForm),
+      })
+      const data = await res.json()
+      if (!res.ok) onToast(false, data.error || 'فشل الإنشاء')
+      else {
+        onToast(true, data.message || 'تم إنشاء الحساب')
+        setShowCreate(false)
+        setCreateForm({ cafeName: '', ownerName: '', email: '', password: '' })
+        await load()
+      }
+    } catch {
+      onToast(false, 'خطأ اتصال')
+    }
+    setCreateBusy(false)
+  }
+
   if (loading) return <p className="text-center text-zinc-500 py-6">...</p>
   if (denied) {
     return (
@@ -148,86 +186,157 @@ export default function TenantsTab({ onToast }: { onToast: (ok: boolean, msg: st
       </p>
     )
   }
-  if (!tenants.length) {
-    return <p className="text-sm text-zinc-500 text-center py-4">لا توجد حسابات بعد</p>
-  }
 
   return (
-    <div className="space-y-2 max-h-80 overflow-y-auto">
-      {tenants.map((t) => {
-        const active = t.status === 'active'
-        return (
-          <div key={t.id} className="card" style={{ padding: 12 }}>
-            <div className="flex items-start justify-between gap-2 mb-2">
-              <div className="text-right flex-1">
-                <p className="text-sm text-white font-medium">{t.name}</p>
-                <p className="text-xs text-zinc-500">
-                  {t.owner_name || '—'} · {t.owner_email || 'بدون إيميل'}
-                </p>
-                <p className="text-xs text-zinc-600">
-                  موظفين: {t.employee_count} ·{' '}
-                  <span style={{ color: active ? '#6ee7b7' : '#fcd34d' }}>
-                    {active ? 'نشط' : 'موقوف'}
-                  </span>
-                </p>
+    <div className="space-y-3">
+      <button
+        onClick={() => setShowCreate(true)}
+        className="w-full py-2.5 rounded-xl text-sm font-bold text-white"
+        style={{ background: 'linear-gradient(135deg, #059669, #d97706)' }}
+      >
+        + إنشاء حساب زبون
+      </button>
+
+      <div className="space-y-2 max-h-72 overflow-y-auto">
+        {!tenants.length ? (
+          <p className="text-sm text-zinc-500 text-center py-4">لا توجد حسابات بعد</p>
+        ) : (
+          tenants.map((t) => {
+            const active = t.status === 'active'
+            return (
+              <div key={t.id} className="card" style={{ padding: 12 }}>
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <div className="text-right flex-1">
+                    <p className="text-sm text-white font-medium">{t.name}</p>
+                    <p className="text-xs text-zinc-500">
+                      {t.owner_name || '—'} · {t.owner_email || 'بدون إيميل'}
+                    </p>
+                    <p className="text-xs text-zinc-600">
+                      موظفين: {t.employee_count} ·{' '}
+                      <span style={{ color: active ? '#6ee7b7' : '#fcd34d' }}>
+                        {active ? 'نشط' : 'موقوف'}
+                      </span>
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-1.5 flex-wrap">
+                  <button
+                    disabled={busyId === t.id}
+                    onClick={() => openEdit(t)}
+                    className="text-xs px-2.5 py-1.5 rounded-lg"
+                    style={{
+                      background: 'rgba(59,130,246,0.15)',
+                      color: '#93c5fd',
+                      border: '1px solid rgba(59,130,246,0.35)',
+                    }}
+                  >
+                    تعديل الحساب
+                  </button>
+                  {active ? (
+                    <button
+                      disabled={busyId === t.id}
+                      onClick={() => act(t.id, 'suspend', t.name)}
+                      className="text-xs px-2.5 py-1.5 rounded-lg"
+                      style={{
+                        background: 'rgba(245,158,11,0.15)',
+                        color: '#fcd34d',
+                        border: '1px solid rgba(245,158,11,0.35)',
+                      }}
+                    >
+                      إيقاف
+                    </button>
+                  ) : (
+                    <button
+                      disabled={busyId === t.id}
+                      onClick={() => act(t.id, 'activate', t.name)}
+                      className="text-xs px-2.5 py-1.5 rounded-lg"
+                      style={{
+                        background: 'rgba(16,185,129,0.15)',
+                        color: '#6ee7b7',
+                        border: '1px solid rgba(16,185,129,0.35)',
+                      }}
+                    >
+                      تشغيل
+                    </button>
+                  )}
+                  <button
+                    disabled={busyId === t.id}
+                    onClick={() => act(t.id, 'delete', t.name)}
+                    className="text-xs px-2.5 py-1.5 rounded-lg"
+                    style={{
+                      background: 'rgba(220,38,38,0.15)',
+                      color: '#fca5a5',
+                      border: '1px solid rgba(220,38,38,0.35)',
+                    }}
+                  >
+                    حذف
+                  </button>
+                </div>
               </div>
+            )
+          })
+        )}
+      </div>
+
+      {showCreate && (
+        <div
+          className="fixed inset-0 z-[80] flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.7)' }}
+          onClick={() => setShowCreate(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl p-4 space-y-3"
+            style={{ background: '#18181b', border: '1px solid #3f3f46' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-white font-bold text-base">إنشاء حساب زبون</h3>
+            <div>
+              <label className="label">اسم المقهى *</label>
+              <input
+                className="input-field"
+                value={createForm.cafeName}
+                onChange={(e) => setCreateForm({ ...createForm, cafeName: e.target.value })}
+                style={{ textAlign: 'right' }}
+              />
             </div>
-            <div className="flex gap-1.5 flex-wrap">
-              <button
-                disabled={busyId === t.id}
-                onClick={() => openEdit(t)}
-                className="text-xs px-2.5 py-1.5 rounded-lg"
-                style={{
-                  background: 'rgba(59,130,246,0.15)',
-                  color: '#93c5fd',
-                  border: '1px solid rgba(59,130,246,0.35)',
-                }}
-              >
-                تعديل الحساب
-              </button>
-              {active ? (
-                <button
-                  disabled={busyId === t.id}
-                  onClick={() => act(t.id, 'suspend', t.name)}
-                  className="text-xs px-2.5 py-1.5 rounded-lg"
-                  style={{
-                    background: 'rgba(245,158,11,0.15)',
-                    color: '#fcd34d',
-                    border: '1px solid rgba(245,158,11,0.35)',
-                  }}
-                >
-                  إيقاف
-                </button>
-              ) : (
-                <button
-                  disabled={busyId === t.id}
-                  onClick={() => act(t.id, 'activate', t.name)}
-                  className="text-xs px-2.5 py-1.5 rounded-lg"
-                  style={{
-                    background: 'rgba(16,185,129,0.15)',
-                    color: '#6ee7b7',
-                    border: '1px solid rgba(16,185,129,0.35)',
-                  }}
-                >
-                  تشغيل
-                </button>
-              )}
-              <button
-                disabled={busyId === t.id}
-                onClick={() => act(t.id, 'delete', t.name)}
-                className="text-xs px-2.5 py-1.5 rounded-lg"
-                style={{
-                  background: 'rgba(220,38,38,0.15)',
-                  color: '#fca5a5',
-                  border: '1px solid rgba(220,38,38,0.35)',
-                }}
-              >
-                حذف
-              </button>
+            <div>
+              <label className="label">اسم المالك</label>
+              <input
+                className="input-field"
+                value={createForm.ownerName}
+                onChange={(e) => setCreateForm({ ...createForm, ownerName: e.target.value })}
+                style={{ textAlign: 'right' }}
+              />
             </div>
+            <div>
+              <label className="label">البريد *</label>
+              <input
+                className="input-field"
+                value={createForm.email}
+                onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
+                dir="ltr"
+                style={{ textAlign: 'left' }}
+              />
+            </div>
+            <div>
+              <label className="label">كلمة المرور *</label>
+              <input
+                type="password"
+                className="input-field"
+                value={createForm.password}
+                onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })}
+                dir="ltr"
+              />
+            </div>
+            <button disabled={createBusy} onClick={createAccount} className="btn-primary w-full">
+              {createBusy ? '...' : 'إنشاء وتسليم للزبون'}
+            </button>
+            <button onClick={() => setShowCreate(false)} className="btn-secondary w-full">
+              إلغاء
+            </button>
           </div>
-        )
-      })}
+        </div>
+      )}
 
       {editTarget && (
         <div
@@ -278,7 +387,6 @@ export default function TenantsTab({ onToast }: { onToast: (ok: boolean, msg: st
                 value={editPassword}
                 onChange={(e) => setEditPassword(e.target.value)}
                 dir="ltr"
-                placeholder="6 أحرف على الأقل"
               />
               <button
                 disabled={editBusy || editPassword.length < 6}

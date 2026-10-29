@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { adminDb, requireTenant } from '@/lib/tenant'
+import { requireSuperAdmin } from '@/lib/superAdmin'
 
 export async function GET() {
   const ctx = await requireTenant(['owner', 'manager'])
@@ -61,15 +62,26 @@ export async function POST(req: NextRequest) {
     if (name.length > 80) {
       return NextResponse.json({ error: 'اسم الكافيه طويل جداً' }, { status: 400 })
     }
-    // فقط المالك يعدّل الاسم
-    if (ctx.role !== 'owner' && ctx.role !== 'manager') {
-      return NextResponse.json({ error: 'غير مصرح' }, { status: 403 })
-    }
     const { error } = await db
       .from('tenants')
       .update({ name, updated_at: new Date().toISOString() })
       .eq('id', ctx.tenantId)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+    // إذا سوبر أدمن — حدّث اسم صفحة الدخول أيضاً
+    const superAdmin = await requireSuperAdmin()
+    if (superAdmin) {
+      await db.from('system_settings').upsert(
+        {
+          tenant_id: ctx.tenantId,
+          key: 'platform_display_name',
+          value: name,
+          description: 'اسم المنصة على صفحة الدخول',
+        },
+        { onConflict: 'tenant_id,key' }
+      )
+    }
+
     return NextResponse.json({ success: true, cafe_name: name })
   }
 
