@@ -14,7 +14,6 @@ export async function GET() {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // عدد الموظفين + إيميل المالك لكل مقهى
   const enriched = []
   for (const t of tenants || []) {
     const { count } = await db
@@ -54,8 +53,10 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json()
   const { action, tenant_id } = body as {
-    action: 'suspend' | 'activate' | 'delete'
+    action: 'suspend' | 'activate' | 'delete' | 'set_email' | 'set_password'
     tenant_id: string
+    email?: string
+    password?: string
   }
 
   if (!tenant_id || !action) {
@@ -82,22 +83,43 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, message: `تم تفعيل «${tenant.name}»` })
   }
 
+  if (action === 'set_email') {
+    if (!tenant.owner_user_id) {
+      return NextResponse.json({ error: 'لا يوجد حساب مالك مرتبط' }, { status: 400 })
+    }
+    const email = String(body.email || '').trim().toLowerCase()
+    if (!email.includes('@') || email.length < 5) {
+      return NextResponse.json({ error: 'بريد غير صالح' }, { status: 400 })
+    }
+    const { error } = await db.auth.admin.updateUserById(tenant.owner_user_id, { email })
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+    return NextResponse.json({ success: true, message: `تم تغيير بريد «${tenant.name}»` })
+  }
+
+  if (action === 'set_password') {
+    if (!tenant.owner_user_id) {
+      return NextResponse.json({ error: 'لا يوجد حساب مالك مرتبط' }, { status: 400 })
+    }
+    const password = String(body.password || '')
+    if (password.length < 6) {
+      return NextResponse.json({ error: 'كلمة المرور 6 أحرف على الأقل' }, { status: 400 })
+    }
+    const { error } = await db.auth.admin.updateUserById(tenant.owner_user_id, { password })
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+    return NextResponse.json({ success: true, message: `تم تغيير كلمة سر «${tenant.name}»` })
+  }
+
   if (action === 'delete') {
-    // حذف نهائي: بيانات المقهى + حساب المالك
-    // profiles / attendance / withdrawals مربوطة بـ ON DELETE CASCADE من tenants إن وُجد
-    // نحذف يدوياً للتأكيد
     await db.from('employee_withdrawals').delete().eq('tenant_id', tenant_id)
     await db.from('attendance_records').delete().eq('tenant_id', tenant_id)
     await db.from('daily_attendance').delete().eq('tenant_id', tenant_id)
     await db.from('system_settings').delete().eq('tenant_id', tenant_id)
 
-    // اجلب كل مستخدمي المقهى قبل حذف البروفايلات
     const { data: members } = await db.from('profiles').select('id').eq('tenant_id', tenant_id)
 
     await db.from('profiles').delete().eq('tenant_id', tenant_id)
     await db.from('tenants').delete().eq('id', tenant_id)
 
-    // احذف حسابات Auth
     for (const m of members || []) {
       try {
         await db.auth.admin.deleteUser(m.id)

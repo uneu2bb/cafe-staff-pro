@@ -17,6 +17,10 @@ export default function TenantsTab({ onToast }: { onToast: (ok: boolean, msg: st
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [denied, setDenied] = useState(false)
+  const [editTarget, setEditTarget] = useState<TenantRow | null>(null)
+  const [editEmail, setEditEmail] = useState('')
+  const [editPassword, setEditPassword] = useState('')
+  const [editBusy, setEditBusy] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -63,6 +67,55 @@ export default function TenantsTab({ onToast }: { onToast: (ok: boolean, msg: st
     setBusyId(null)
   }
 
+  const openEdit = (t: TenantRow) => {
+    setEditTarget(t)
+    setEditEmail(t.owner_email || '')
+    setEditPassword('')
+  }
+
+  const saveEmail = async () => {
+    if (!editTarget) return
+    setEditBusy(true)
+    try {
+      const res = await fetch('/api/super-admin/tenants', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tenant_id: editTarget.id, action: 'set_email', email: editEmail }),
+      })
+      const data = await res.json()
+      if (!res.ok) onToast(false, data.error || 'فشل')
+      else {
+        onToast(true, data.message || 'تم')
+        await load()
+        setEditTarget((prev) => (prev ? { ...prev, owner_email: editEmail.trim().toLowerCase() } : null))
+      }
+    } catch {
+      onToast(false, 'خطأ اتصال')
+    }
+    setEditBusy(false)
+  }
+
+  const savePassword = async () => {
+    if (!editTarget) return
+    setEditBusy(true)
+    try {
+      const res = await fetch('/api/super-admin/tenants', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tenant_id: editTarget.id, action: 'set_password', password: editPassword }),
+      })
+      const data = await res.json()
+      if (!res.ok) onToast(false, data.error || 'فشل')
+      else {
+        onToast(true, data.message || 'تم')
+        setEditPassword('')
+      }
+    } catch {
+      onToast(false, 'خطأ اتصال')
+    }
+    setEditBusy(false)
+  }
+
   if (loading) return <p className="text-center text-zinc-500 py-6">...</p>
   if (denied) {
     return (
@@ -96,12 +149,24 @@ export default function TenantsTab({ onToast }: { onToast: (ok: boolean, msg: st
               </div>
             </div>
             <div className="flex gap-1.5 flex-wrap">
+              <button
+                disabled={busyId === t.id}
+                onClick={() => openEdit(t)}
+                className="text-xs px-2.5 py-1.5 rounded-lg"
+                style={{
+                  background: 'rgba(59,130,246,0.15)',
+                  color: '#93c5fd',
+                  border: '1px solid rgba(59,130,246,0.35)',
+                }}
+              >
+                بريد / كلمة سر
+              </button>
               {active ? (
                 <button
                   disabled={busyId === t.id}
                   onClick={() => act(t.id, 'suspend', t.name)}
                   className="text-xs px-2.5 py-1.5 rounded-lg"
-                  style={{
+ style={{
                     background: 'rgba(245,158,11,0.15)',
                     color: '#fcd34d',
                     border: '1px solid rgba(245,158,11,0.35)',
@@ -139,6 +204,64 @@ export default function TenantsTab({ onToast }: { onToast: (ok: boolean, msg: st
           </div>
         )
       })}
+
+      {editTarget && (
+        <div
+          className="fixed inset-0 z-[80] flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.7)' }}
+          onClick={() => setEditTarget(null)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl p-4 space-y-3"
+            style={{ background: '#18181b', border: '1px solid #3f3f46' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-white font-bold text-base">تعديل حساب — {editTarget.name}</h3>
+            <p className="text-xs text-zinc-500">{editTarget.owner_name || 'المالك'}</p>
+
+            <div>
+              <label className="label">البريد</label>
+              <input
+                className="input-field"
+                value={editEmail}
+                onChange={(e) => setEditEmail(e.target.value)}
+                dir="ltr"
+                style={{ textAlign: 'left' }}
+              />
+              <button
+                disabled={editBusy}
+                onClick={saveEmail}
+                className="btn-secondary w-full mt-2 text-sm"
+              >
+                حفظ البريد
+              </button>
+            </div>
+
+            <div>
+              <label className="label">كلمة مرور جديدة</label>
+              <input
+                type="password"
+                className="input-field"
+                value={editPassword}
+                onChange={(e) => setEditPassword(e.target.value)}
+                dir="ltr"
+                placeholder="6 أحرف على الأقل"
+              />
+              <button
+                disabled={editBusy || editPassword.length < 6}
+                onClick={savePassword}
+                className="btn-secondary w-full mt-2 text-sm"
+              >
+                حفظ كلمة السر
+              </button>
+            </div>
+
+            <button onClick={() => setEditTarget(null)} className="btn-secondary w-full">
+              إغلاق
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
