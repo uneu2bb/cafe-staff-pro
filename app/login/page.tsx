@@ -1,8 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
 export default function LoginPage() {
@@ -11,6 +10,16 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [brandName, setBrandName] = useState('Cafe Staff Pro')
+
+  useEffect(() => {
+    fetch('/api/public/brand')
+      .then((r) => r.json())
+      .then((d) => {
+        if (d?.name) setBrandName(d.name)
+      })
+      .catch(() => {})
+  }, [])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -45,7 +54,7 @@ export default function LoginPage() {
           >
             <span style={{ fontSize: 28 }}>☕</span>
           </div>
-          <h1 className="text-2xl font-bold text-white">Cafe Staff Pro</h1>
+          <h1 className="text-2xl font-bold text-white">{brandName}</h1>
           <p className="text-zinc-400 text-sm mt-1">نظام إدارة الحضور والانصراف</p>
         </div>
 
@@ -57,7 +66,7 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="input-field"
-              placeholder="email@example.com"
+              placeholder=""
               required
               dir="ltr"
               style={{ textAlign: 'left' }}
@@ -70,7 +79,7 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="input-field"
-              placeholder="••••••••"
+              placeholder=""
               required
               dir="ltr"
               style={{ textAlign: 'left' }}
@@ -93,13 +102,6 @@ export default function LoginPage() {
           <button type="submit" disabled={loading} className="btn-primary w-full py-3 text-base">
             {loading ? 'جاري الدخول...' : 'تسجيل الدخول'}
           </button>
-
-          <p className="text-center text-sm text-zinc-500">
-            مقهى جديد؟{' '}
-            <Link href="/register" className="text-amber-400 hover:underline">
-              إنشاء حساب
-            </Link>
-          </p>
         </form>
       </div>
     </div>

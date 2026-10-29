@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createTenantWithOwner } from '@/lib/tenant'
+import { requireSuperAdmin } from '@/lib/superAdmin'
 
 export async function POST(req: NextRequest) {
+  const admin = await requireSuperAdmin()
+  if (!admin) {
+    return NextResponse.json(
+      { error: 'التسجيل العام مغلق. تواصل مع المسؤول لإنشاء حساب.' },
+      { status: 403 }
+    )
+  }
+
   try {
     const body = await req.json()
     const result = await createTenantWithOwner({
@@ -17,7 +26,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'تم إنشاء حساب المقهى بنجاح. يمكنك تسجيل الدخول الآن.',
+      message: 'تم إنشاء حساب المقهى بنجاح.',
       tenantId: result.tenantId,
     })
   } catch (e: unknown) {
