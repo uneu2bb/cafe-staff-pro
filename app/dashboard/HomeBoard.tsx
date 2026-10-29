@@ -44,7 +44,7 @@ function statusMeta(s: string) {
   return map[s] || map.none
 }
 
-export default function HomeBoard({ adminName, adminRole }: { adminName: string; adminRole: string }) {
+export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp = 'Cafe Staff Pro' }: { adminName: string; adminRole: string; cafeName?: string }) {
   const router = useRouter()
   const [employees, setEmployees] = useState<Employee[]>([])
   const [todayMap, setTodayMap] = useState<Record<string, DayInfo>>({})
@@ -73,7 +73,8 @@ export default function HomeBoard({ adminName, adminRole }: { adminName: string;
   const [panelBusy, setPanelBusy] = useState(false)
   const [isSuperAdmin, setIsSuperAdmin] = useState(false)
   const [newEmail, setNewEmail] = useState('')
-  const [cafeName, setCafeName] = useState('')
+  const [cafeName, setCafeName] = useState(cafeNameProp)
+  const [siteTitle, setSiteTitle] = useState(cafeNameProp)
   const [newPanelPwd, setNewPanelPwd] = useState('')
   const [rateSyp, setRateSyp] = useState('15000')
   const [rateTry, setRateTry] = useState('34')
@@ -289,7 +290,7 @@ export default function HomeBoard({ adminName, adminRole }: { adminName: string;
         <div className="max-w-6xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <button type="button" onClick={onLogoClick} className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #059669, #d97706)', border: 'none', cursor: 'pointer' }}><span className="text-lg">☕</span></button>
-            <div><h1 className="font-bold text-white text-base">Cafe Staff Pro</h1><p className="text-xs text-zinc-500">{adminName} · {adminRole === 'owner' ? 'المالك' : 'مدير'}</p></div>
+            <div><h1 className="font-bold text-white text-base">{siteTitle}</h1><p className="text-xs text-zinc-500">{adminName} · {adminRole === 'owner' ? 'المالك' : 'مدير'}</p></div>
           </div>
           <div className="flex items-center gap-2">
             <button onClick={() => setShowAdd(true)} className="btn-primary text-sm px-4 py-2">+ موظف</button>
@@ -469,8 +470,8 @@ export default function HomeBoard({ adminName, adminRole }: { adminName: string;
             )}
             {panelTab === 'account' && (
               <div className="space-y-3">
-                <div><label className="label">اسم الكافيه</label><input className="input-field" value={cafeName} onChange={(e) => setCafeName(e.target.value)} style={{ textAlign: 'right' }} placeholder="" />
-                  <button className="btn-secondary w-full mt-2 text-sm" onClick={async () => { const res = await fetch('/api/admin/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'update_cafe_name', cafe_name: cafeName }) }); const d = await res.json(); showToast(res.ok, res.ok ? 'تم تغيير الاسم' : d.error) }}>حفظ الاسم</button></div>
+                <div><label className="label">اسم الكافيه / الموقع</label><input className="input-field" value={cafeName} onChange={(e) => setCafeName(e.target.value)} style={{ textAlign: 'right' }} placeholder="" />
+                  <button className="btn-secondary w-full mt-2 text-sm" onClick={async () => { const res = await fetch('/api/admin/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'update_cafe_name', cafe_name: cafeName }) }); const d = await res.json(); if (res.ok) { setSiteTitle(cafeName.trim() || siteTitle); showToast(true, 'تم تغيير الاسم') } else showToast(false, d.error) }}>حفظ الاسم</button></div>
                 <div><label className="label">البريد</label><input className="input-field" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} dir="ltr" style={{ textAlign: 'left' }} />
                   <button className="btn-secondary w-full mt-2 text-sm" onClick={async () => { const res = await fetch('/api/admin/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'update_email', email: newEmail }) }); const d = await res.json(); showToast(res.ok, res.ok ? 'تم' : d.error) }}>حفظ</button></div>
                 <div><label className="label">كلمة مرور اللوحة</label><input type="password" className="input-field" value={newPanelPwd} onChange={(e) => setNewPanelPwd(e.target.value)} dir="ltr" />
