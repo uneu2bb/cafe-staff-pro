@@ -493,7 +493,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
               <h3 className="m-0 text-sm font-extrabold" style={{ color: '#f3e5c7' }}><span className="ml-1.5" style={{ color: 'var(--gold)' }}>♟</span> قائمة الموظفين</h3>
               <div className="flex items-center gap-2 rounded-[11px] px-3 py-2 min-w-[200px] flex-1 sm:flex-none" style={{ border: '1px solid var(--line)', background: '#080e13' }}>
                 <span>⌕</span>
-                <input className="bg-transparent border-0 outline-none text-white text-xs w-full" placeholder="ابحث عن موظف..." value={search} onChange={(e) => setSearch(e.target.value)} style={{ textAlign: 'right' }} />
+                <input className="bg-transparent border-0 outline-none text-white text-xs w-full" placeholder="ابحث عن موظف..." value={search} onChange={(e) => setSearch(e.target.value)} style={{ textAlign: 'right' }}'right' }} />
               </div>
             </div>
             {loading ? <p className="text-center py-10 text-sm" style={{ color: 'var(--muted)' }}>جاري التحميل...</p> : (
@@ -667,19 +667,40 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
                     )}
                   </div>
                 </div>
-                <button className="btn-gold w-full text-sm" disabled={panelBusy} onClick={async () => {
-                  setPanelBusy(true)
-                  const res = await fetch('/api/withdrawals', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(wForm) })
-                  const d = await res.json()
-                  if (!res.ok) showToast(false, d.error || 'فشل')
-                  else {
-                    const emp = employees.find((x) => x.id === wForm.employee_id)
-                    const sent = sendWithdrawalWhatsApp(emp?.phone, wForm.amount, wForm.currency)
-                    showToast(true, sent ? 'تم السحب وفُتح واتساب' : 'تم السحب — أضف رقم واتساب للموظف')
-                    setWForm({ employee_id: '', amount: '', currency: 'USD', note: '' }); load()
-                  }
-                  setPanelBusy(false)
-                }}>تسجيل سحب</button>
+                <div className="grid grid-cols-1 gap-2">
+                  <button type="button" className="btn-dark w-full text-sm" disabled={panelBusy} onClick={async () => {
+                    if (!wForm.employee_id || !wForm.amount) { showToast(false, 'اختر موظفاً وأدخل المبلغ'); return }
+                    setPanelBusy(true)
+                    try {
+                      const res = await fetch('/api/withdrawals', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(wForm) })
+                      const d = await res.json()
+                      if (!res.ok) showToast(false, d.error || 'فشل')
+                      else {
+                        showToast(true, 'تم تسجيل السحب في الملف')
+                        setWForm({ employee_id: '', amount: '', currency: 'USD', note: '' })
+                        load()
+                      }
+                    } catch { showToast(false, 'خطأ اتصال') }
+                    setPanelBusy(false)
+                  }}>تسجيل سحب فقط</button>
+                  <button type="button" className="btn-gold w-full text-sm" disabled={panelBusy} onClick={async () => {
+                    if (!wForm.employee_id || !wForm.amount) { showToast(false, 'اختر موظفاً وأدخل المبلغ'); return }
+                    setPanelBusy(true)
+                    try {
+                      const res = await fetch('/api/withdrawals', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(wForm) })
+                      const d = await res.json()
+                      if (!res.ok) showToast(false, d.error || 'فشل')
+                      else {
+                        const emp = employees.find((x) => x.id === wForm.employee_id)
+                        const sent = sendWithdrawalWhatsApp(emp?.phone, wForm.amount, wForm.currency)
+                        showToast(true, sent ? 'تم التسجيل وفُتح واتساب للإرسال' : 'تم التسجيل — لا يوجد رقم واتساب للموظف')
+                        setWForm({ employee_id: '', amount: '', currency: 'USD', note: '' })
+                        load()
+                      }
+                    } catch { showToast(false, 'خطأ اتصال') }
+                    setPanelBusy(false)
+                  }}>تسجيل سحب عبر واتساب</button>
+                </div>
               </div>
             )}
             {panelTab === 'rates' && (
