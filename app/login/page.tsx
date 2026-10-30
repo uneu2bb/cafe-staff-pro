@@ -38,16 +38,6 @@ export default function LoginPage() {
       }}
     >
       <div className="w-full max-w-sm text-center">
-        <div
-          className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-6"
-          style={{
-            background: 'rgba(214,163,75,0.1)',
-            border: '1px solid rgba(214,163,75,0.4)',
-          }}
-        >
-          <span style={{ fontSize: 26 }}>☕</span>
-        </div>
-
         <p className="text-sm mb-6" style={{ color: '#9ca7b0' }}>
           تسجيل الدخول إلى النظام
         </p>
