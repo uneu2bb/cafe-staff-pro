@@ -25,7 +25,6 @@ type Session = { startMs: number; endMs: number | null; running: boolean }
 type Withdrawal = { id: string; employee_id: string; amount: number; currency: string; note: string | null; withdrawn_at: string }
 
 const SESS_KEY = 'cafe_staff_sessions'
-const DAY_NAMES = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
 
 function fmtTime(iso: string | null) {
   if (!iso) return '—'
@@ -396,7 +395,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
       {toast && (
         <div className="fixed bottom-5 left-5 z-[80] px-4 py-3 rounded-xl text-sm font-bold" style={{ background: toast.ok ? '#14241d' : '#2a1418', border: `1px solid ${toast.ok ? '#26865d' : '#d83e4d'}`, color: toast.ok ? '#d6ffea' : '#ffd0d4' }}>{toast.msg}</div>
       )}
-      {mobileOpen && <div className="fixed inset-0 z-[15] md:hidden" style={{ background: 'rgba(0,0,0,.58)' }} onClick={() => setMobileOpen(false)} false)} />}
+      {mobileOpen && <div className="fixed inset-0 z-[15] md:hidden" style={{ background: 'rgba(0,0,0,.58)' }} onClick={() => setMobileOpen(false)} />}
 
       <aside className={`csp-sidebar fixed top-0 h-screen z-20 flex flex-col${mobileOpen ? ' open' : ''}${!sidebarOpen ? ' collapsed' : ''}`} style={{ width: 264, padding: '24px 16px', background: 'linear-gradient(180deg,#0d1115,#080b0e 78%)', borderLeft: '1px solid var(--line)' }}>
         <style>{`aside.csp-sidebar{right:0;transition:transform .28s ease}.csp-main-wrap{transition:margin-right .28s ease}aside.csp-sidebar.collapsed{transform:translateX(110%)}.csp-main-wrap.full{margin-right:0!important}@media(max-width:768px){aside.csp-sidebar{right:-285px;width:270px;transform:none}aside.csp-sidebar.open{right:0}.csp-main-wrap{margin-right:0!important}}`}</style>
