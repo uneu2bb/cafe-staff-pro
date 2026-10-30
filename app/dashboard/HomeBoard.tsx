@@ -36,10 +36,10 @@ function formatElapsed(ms: number) {
 }
 function statusMeta(s: string) {
   const map: Record<string, { label: string; color: string; bg: string }> = {
-    none: { label: 'لم يسجل', color: '#8ab4f8', bg: 'rgba(90,122,154,0.2)' },
-    present: { label: 'يعمل الآن', color: '#00ffcc', bg: 'rgba(0,255,204,0.15)' },
-    checked_out: { label: 'محفوظ', color: '#8ab4f8', bg: 'rgba(0,119,255,0.18)' },
-    stopped: { label: 'متوقف', color: '#ffd666', bg: 'rgba(255,214,102,0.15)' },
+    none: { label: 'لم يسجل', color: '#A8B3C2', bg: 'rgba(122,134,150,0.2)' },
+    present: { label: 'يعمل الآن', color: '#34D399', bg: 'rgba(52,211,153,0.15)' },
+    checked_out: { label: 'محفوظ', color: '#60A5FA', bg: 'rgba(96,165,250,0.15)' },
+    stopped: { label: 'متوقف', color: '#FB923C', bg: 'rgba(251,146,60,0.15)' },
   }
   return map[s] || map.none
 }
@@ -88,7 +88,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
   const [rateTry, setRateTry] = useState('34')
   const [wForm, setWForm] = useState({ employee_id: '', amount: '', currency: 'USD', note: '' })
   const [form, setForm] = useState({ full_name: '', employee_number: '', salary_amount: '', work_hours_per_day: '8', job_title: '', notes: '', pin_code: '0000' })
-  const [saving, setSaving] = useState(false)
+  const [saving, setSaving] = useFalse
   const [mobileNav, setMobileNav] = useState(false)
 
   const showToast = (ok: boolean, msg: string) => { setToast({ ok, msg }); setTimeout(() => setToast(null), 2200) }
@@ -310,23 +310,23 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
   const roleLabel = adminRole === 'owner' ? 'المالك' : adminRole === 'manager' ? 'مدير' : adminRole
 
   return (
-    <div className="min-h-screen" style={{ background: '#050b14' }}>
+    <div className="min-h-screen" style={{ background: '#080D12' }}>
       {toast && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[60] px-5 py-3 rounded-full text-sm font-bold shadow-xl" style={{ background: toast.ok ? 'rgba(0,255,204,0.92)' : 'rgba(255,51,51,0.92)', color: toast.ok ? '#050b14' : '#fff' }}>
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[60] px-5 py-3 rounded-full text-sm font-bold shadow-xl" style={{ background: toast.ok ? 'rgba(214,168,79,0.95)' : 'rgba(220,38,38,0.95)', color: toast.ok ? '#080D12' : '#fff' }}>
           {toast.msg}
         </div>
       )}
 
       <div className="flex min-h-screen">
-        <aside className="hidden md:flex flex-col w-[240px] shrink-0 border-l" style={{ background: 'linear-gradient(180deg,#050b14,#0a1420)', borderColor: 'rgba(0,255,204,0.22)' }}>
-          <div className="p-5 border-b" style={{ borderColor: 'rgba(0,255,204,0.15)' }}>
+        <aside className="hidden md:flex flex-col w-[240px] shrink-0 border-l" style={{ background: 'linear-gradient(180deg,#080D12,#0B1219)', borderColor: 'rgba(214,168,79,0.22)' }}>
+          <div className="p-5 border-b" style={{ borderColor: 'rgba(214,168,79,0.15)' }}>
             <button type="button" onClick={onLogoClick} className="flex items-center gap-3 w-full text-right" style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
-              <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(0,255,204,0.12)', border: '2px solid #00ffcc' }}>
+              <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(214,168,79,0.12)', border: '1.5px solid #D6A84F' }}>
                 <span className="text-lg">☕</span>
               </div>
               <div className="text-right flex-1">
-                <p className="neon-title text-sm leading-tight" style={{ fontSize: 14 }}>{siteTitle}</p>
-                <p className="text-[11px] text-[#5a7a9a] mt-0.5">نظام الحضور</p>
+                <p className="gold-title text-sm leading-tight" style={{ fontSize: 14 }}>{siteTitle}</p>
+                <p className="text-[11px] text-[#7A8696] mt-0.5">نظام الحضور · LMR</p>
               </div>
             </button>
           </div>
@@ -336,28 +336,28 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
             <button type="button" className="side-nav-item" onClick={() => { setShowPanelGate(true); setPanelPwd('') }}>⚙️ لوحة التحكم</button>
             <button type="button" className="side-nav-item" onClick={() => { setLoading(true); load() }}>🔄 تحديث</button>
           </nav>
-          <div className="p-4 border-t" style={{ borderColor: 'rgba(0,255,204,0.15)' }}>
+          <div className="p-4 border-t" style={{ borderColor: 'rgba(214,168,79,0.15)' }}>
             <div className="flex items-center gap-3 mb-3">
-              <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold" style={{ background: 'rgba(0,255,204,0.12)', border: '1.5px solid #00ffcc', color: '#00ffcc' }}>
+              <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold" style={{ background: 'rgba(214,168,79,0.12)', border: '1.5px solid #D6A84F', color: '#D6A84F' }}>
                 {(adminName || 'م').charAt(0)}
               </div>
               <div className="text-right flex-1 min-w-0">
                 <p className="text-sm text-white font-medium truncate">{adminName}</p>
-                <p className="text-[11px] text-[#5a7a9a]">{roleLabel}</p>
+                <p className="text-[11px] text-[#7A8696]">{roleLabel}</p>
               </div>
             </div>
-            <button onClick={async () => { await createClient().auth.signOut(); router.push('/login') }} className="side-nav-item" style={{ color: '#ff5555' }}>خروج</button>
+            <button onClick={async () => { await createClient().auth.signOut(); router.push('/login') }} className="side-nav-item" style={{ color: '#EF4444' }}>خروج</button>
           </div>
         </aside>
 
         <div className="flex-1 min-w-0">
-          <header className="sticky top-0 z-20 border-b md:hidden" style={{ background: 'rgba(5,11,20,0.95)', borderColor: 'rgba(0,255,204,0.18)' }}>
+          <header className="sticky top-0 z-20 border-b md:hidden" style={{ background: 'rgba(8,13,18,0.95)', borderColor: 'rgba(214,168,79,0.18)' }}>
             <div className="px-4 py-3 flex items-center justify-between gap-3">
               <button type="button" onClick={onLogoClick} className="flex items-center gap-2" style={{ background: 'none', border: 'none' }}>
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(0,255,204,0.12)', border: '2px solid #00ffcc' }}><span>☕</span></div>
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(214,168,79,0.12)', border: '1.5px solid #D6A84F' }}><span>☕</span></div>
                 <div className="text-right">
-                  <p className="neon-title text-sm">{siteTitle}</p>
-                  <p className="text-[10px] text-[#5a7a9a]">{adminName}</p>
+                  <p className="gold-title text-sm">{siteTitle}</p>
+                  <p className="text-[10px] text-[#7A8696]">{adminName}</p>
                 </div>
               </button>
               <div className="flex gap-2">
@@ -366,25 +366,25 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
               </div>
             </div>
             {mobileNav && (
-              <div className="px-4 pb-3 space-y-1 border-t" style={{ borderColor: 'rgba(0,255,204,0.12)' }}>
+              <div className="px-4 pb-3 space-y-1 border-t" style={{ borderColor: 'rgba(214,168,79,0.12)' }}>
                 <button className="side-nav-item" onClick={() => { setShowPanelGate(true); setMobileNav(false) }}>لوحة التحكم</button>
-                <button className="side-nav-item" onClick={async () => { await createClient().auth.signOut(); router.push('/login') }} style={{ color: '#ff5555' }}>خروج</button>
+                <button className="side-nav-item" onClick={async () => { await createClient().auth.signOut(); router.push('/login') }} style={{ color: '#EF4444' }}>خروج</button>
               </div>
             )}
           </header>
 
           <main className="p-4 md:p-6 space-y-5 max-w-7xl mx-auto">
-            <section className="relative overflow-hidden rounded-2xl border fade-up" style={{ borderColor: 'rgba(0,255,204,0.28)', background: 'linear-gradient(135deg, rgba(5,11,20,0.92), rgba(15,32,39,0.85))' }}>
+            <section className="relative overflow-hidden rounded-2xl border fade-up" style={{ borderColor: 'rgba(214,168,79,0.28)', background: 'linear-gradient(135deg, #101820, #0B1219)' }}>
               <div className="relative z-10 p-5 md:p-7 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="text-right">
-                  <p className="text-[#00ffcc] text-sm mb-1">مرحباً بك في لوحة التحكم</p>
+                  <p className="text-[#D6A84F] text-sm mb-1">مرحباً بك في LMR</p>
                   <h2 className="text-xl md:text-2xl font-bold text-white">إدارة موظفيك بكل سهولة واحترافية</h2>
-                  <p className="text-[#8ab4f8] text-sm mt-2">{siteTitle} · {roleLabel}</p>
+                  <p className="text-[#A8B3C2] text-sm mt-2">{siteTitle} · {roleLabel}</p>
                 </div>
-                <div className="rounded-2xl px-5 py-3 text-center shrink-0" style={{ background: 'rgba(10,20,35,0.75)', border: '1px solid rgba(0,255,204,0.4)' }}>
-                  <p className="text-[11px] text-[#8ab4f8] mb-1">{todayLabel()}</p>
-                  <p className="text-2xl font-bold tracking-wider" dir="ltr" style={{ fontVariantNumeric: 'tabular-nums', color: '#00ffcc' }}>{clock}</p>
-                  <p className="text-[11px] text-[#00ffcc]/80 mt-1">الوقت الحالي</p>
+                <div className="rounded-2xl px-5 py-3 text-center shrink-0" style={{ background: 'rgba(8,13,18,0.7)', border: '1px solid rgba(214,168,79,0.4)' }}>
+                  <p className="text-[11px] text-[#A8B3C2] mb-1">{todayLabel()}</p>
+                  <p className="text-2xl font-bold tracking-wider" dir="ltr" style={{ fontVariantNumeric: 'tabular-nums', color: '#F1CE83' }}>{clock}</p>
+                  <p className="text-[11px] text-[#D6A84F] mt-1">الوقت الحالي</p>
                 </div>
               </div>
             </section>
@@ -399,13 +399,35 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
                 <div key={s.label} className="stat-card">
                   <div className="flex items-start justify-between gap-2">
                     <div className="text-right">
-                      <p className="text-xs text-[#8ab4f8]">{s.label}</p>
+                      <p className="text-xs text-[#A8B3C2]">{s.label}</p>
                       <p className="text-2xl font-bold text-white mt-1">{s.value}</p>
                     </div>
-                    <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg" style={{ background: 'rgba(0,255,204,0.1)', border: '1.5px solid rgba(0,255,204,0.5)', color: '#00ffcc' }}>{s.icon}</div>
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg" style={{ background: 'rgba(214,168,79,0.1)', border: '1.5px solid rgba(214,168,79,0.5)', color: '#D6A84F' }}>{s.icon}</div>
                   </div>
                 </div>
               ))}
+            </section>
+
+{/* Real-data mini bars */}
+            <section className="card">
+              <p className="text-sm font-bold mb-3" style={{ color: '#F1CE83' }}>ملخص اليوم</p>
+              <div className="space-y-3">
+                {[
+                  { label: 'يعملون', value: stats.working, color: '#34D399', max: Math.max(stats.total, 1) },
+                  { label: 'محفوظ', value: stats.saved, color: '#60A5FA', max: Math.max(stats.total, 1) },
+                  { label: 'لم يبدأوا', value: stats.none, color: '#FB923C', max: Math.max(stats.total, 1) },
+                ].map((row) => (
+                  <div key={row.label}>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="text-[#A8B3C2]">{row.label}</span>
+                      <span className="text-white font-medium">{row.value}</span>
+                    </div>
+                    <div className="h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                      <div className="h-full rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (row.value / row.max) * 100)}%`, background: row.color }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
             </section>
 
             <section className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
@@ -417,7 +439,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
             </section>
 
             {loading ? (
-              <div className="text-center py-16 text-[#5a7a9a]">جاري التحميل...</div>
+              <div className="text-center py-16 text-[#7A8696]">جاري التحميل...</div>
             ) : (
               <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
                 {filtered.map((emp) => {
@@ -433,21 +455,21 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
                     <div key={emp.id} className="card glass employee-card">
                       <div className="flex items-start justify-between gap-2 mb-3">
                         <div className="flex items-center gap-3 flex-1 min-w-0">
-                          <div className="w-11 h-11 rounded-xl shrink-0 flex items-center justify-center font-bold" style={{ background: 'rgba(0,255,204,0.12)', border: '1.5px solid #00ffcc', color: '#00ffcc' }}>{emp.full_name.charAt(0)}</div>
+                          <div className="w-11 h-11 rounded-xl shrink-0 flex items-center justify-center font-bold" style={{ background: 'rgba(214,168,79,0.12)', border: '1.5px solid #D6A84F', color: '#D6A84F' }}>{emp.full_name.charAt(0)}</div>
                           <div className="text-right min-w-0">
                             <h3 className="font-bold text-white text-base truncate">{emp.full_name}</h3>
-                            <p className="text-xs text-[#5a7a9a]">#{emp.employee_number} · <span className="text-[#ffd666]">${Number(emp.salary_amount || 0).toFixed(0)}</span></p>
+                            <p className="text-xs text-[#7A8696]">#{emp.employee_number} · <span className="text-[#F1CE83]">${Number(emp.salary_amount || 0).toFixed(0)}</span></p>
                           </div>
                         </div>
                         <span className="text-[11px] px-2.5 py-1 rounded-full shrink-0" style={{ background: st.bg, color: st.color }}>{st.label}</span>
                       </div>
-                      <div className="mb-3 rounded-xl px-3 py-3 text-center" style={{ background: sess?.running ? 'rgba(0,255,204,0.1)' : sess ? 'rgba(255,214,102,0.1)' : 'rgba(10,20,35,0.75)', border: `1px solid ${sess?.running ? 'rgba(0,255,204,0.4)' : sess ? 'rgba(255,214,102,0.4)' : 'rgba(0,255,204,0.22)'}` }}>
-                        <p className="text-[10px] text-[#5a7a9a] mb-0.5">{sess?.running ? 'يعمل الآن' : sess ? 'متوقف — جاهز للحفظ' : day?.worked_minutes ? 'ساعات محفوظة' : 'الساعة'}</p>
-                        <p className="text-2xl font-bold tracking-wider" dir="ltr" style={{ color: sess?.running ? '#00ffcc' : sess ? '#ffd666' : '#8ab4f8', fontVariantNumeric: 'tabular-nums' }}>
+                      <div className="mb-3 rounded-xl px-3 py-3 text-center" style={{ background: sess?.running ? 'rgba(52,211,153,0.1)' : sess ? 'rgba(251,146,60,0.1)' : 'rgba(16,24,32,0.75)', border: `1px solid ${sess?.running ? 'rgba(52,211,153,0.4)' : sess ? 'rgba(251,146,60,0.4)' : 'rgba(214,168,79,0.22)'}` }}>
+                        <p className="text-[10px] text-[#7A8696] mb-0.5">{sess?.running ? 'يعمل الآن' : sess ? 'متوقف — جاهز للحفظ' : day?.worked_minutes ? 'ساعات محفوظة' : 'الساعة'}</p>
+                        <p className="text-2xl font-bold tracking-wider" dir="ltr" style={{ color: sess?.running ? '#34D399' : sess ? '#FB923C' : '#A8B3C2', fontVariantNumeric: 'tabular-nums' }}>
                           {elapsed || (day?.worked_minutes != null ? `${Math.floor(day.worked_minutes / 60)}:${String(day.worked_minutes % 60).padStart(2, '0')}` : '00:00:00')}
                         </p>
                         {(sess || day?.check_in_at) && (
-                          <p className="text-[11px] text-[#5a7a9a] mt-1" dir="ltr">
+                          <p className="text-[11px] text-[#7A8696] mt-1" dir="ltr">
                             {fmtTime(sess ? new Date(sess.startMs).toISOString() : day?.check_in_at || null)}
                             {' → '}
                             {sess?.endMs ? fmtTime(new Date(sess.endMs).toISOString()) : day?.check_out_at ? fmtTime(day.check_out_at) : '...'}
@@ -455,19 +477,19 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
                         )}
                       </div>
                       <div className="grid grid-cols-3 gap-2 mb-2">
-                        <button disabled={!!busyId || !!sess?.running || !!(day?.check_in_at && day?.check_out_at)} onClick={() => startSession(emp.id)} className="py-2.5 rounded-xl text-xs font-bold" style={{ background: 'rgba(0,255,204,0.12)', border: '2px solid #00ffcc', color: '#00ffcc', opacity: sess?.running || (day?.check_in_at && day?.check_out_at) ? 0.4 : 1 }}>حضور</button>
-                        <button disabled={!!busyId || !sess?.running} onClick={() => stopSession(emp.id)} className="py-2.5 rounded-xl text-xs font-bold" style={{ background: 'rgba(255,51,51,0.12)', border: '2px solid #ff3333', color: '#ff6b6b', opacity: !sess?.running ? 0.4 : 1 }}>انصراف</button>
-                        <button disabled={!!busyId || !sess || sess.running} onClick={() => saveSession(emp.id)} className="py-2.5 rounded-xl text-xs font-bold" style={{ background: 'rgba(0,119,255,0.15)', border: '2px solid #0077ff', color: '#8ab4f8', opacity: !sess || sess.running ? 0.4 : 1 }}>{busyId === emp.id ? '...' : 'حفظ'}</button>
+                        <button disabled={!!busyId || !!sess?.running || !!(day?.check_in_at && day?.check_out_at)} onClick={() => startSession(emp.id)} className="py-2.5 rounded-xl text-xs font-bold" style={{ background: 'rgba(52,211,153,0.12)', border: '2px solid #34D399', color: '#34D399', opacity: sess?.running || (day?.check_in_at && day?.check_out_at) ? 0.4 : 1 }}>حضور</button>
+                        <button disabled={!!busyId || !sess?.running} onClick={() => stopSession(emp.id)} className="py-2.5 rounded-xl text-xs font-bold" style={{ background: 'rgba(220,38,38,0.12)', border: '2px solid #DC2626', color: '#F87171', opacity: !sess?.running ? 0.4 : 1 }}>انصراف</button>
+                        <button disabled={!!busyId || !sess || sess.running} onClick={() => saveSession(emp.id)} className="py-2.5 rounded-xl text-xs font-bold" style={{ background: 'rgba(214,168,79,0.12)', border: '2px solid #D6A84F', color: '#F1CE83', opacity: !sess || sess.running ? 0.4 : 1 }}>{busyId === emp.id ? '...' : 'حفظ'}</button>
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         <button onClick={() => openEdit(emp)} className="py-2 rounded-xl text-xs font-medium btn-secondary">تعديل</button>
-                        <button onClick={() => generateReport(emp.id)} className="py-2 rounded-xl text-xs font-medium" style={{ background: 'rgba(0,255,204,0.12)', color: '#00ffcc', border: '1px solid rgba(0,255,204,0.35)' }}>توليد تقرير</button>
+                        <button onClick={() => generateReport(emp.id)} className="py-2 rounded-xl text-xs font-medium" style={{ background: 'rgba(214,168,79,0.12)', color: '#D6A84F', border: '1px solid rgba(214,168,79,0.35)' }}>توليد تقرير</button>
                       </div>
                     </div>
                   )
                 })}
                 {!filtered.length && (
-                  <div className="col-span-full text-center py-12 text-[#5a7a9a] card">لا يوجد موظفون بعد — اضغط «+ موظف جديد»</div>
+                  <div className="col-span-full text-center py-12 text-[#7A8696] card">لا يوجد موظفون بعد — اضغط «+ موظف جديد»</div>
                 )}
               </section>
             )}
@@ -478,7 +500,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
       {showAdd && (
         <div className="modal-backdrop" onClick={() => setShowAdd(false)}>
           <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-bold mb-4" style={{ color: '#00ffcc' }}>إضافة موظف</h2>
+            <h2 className="text-lg font-bold mb-4" style={{ color: '#D6A84F' }}>إضافة موظف</h2>
             <form onSubmit={addEmployee} className="space-y-3">
               <div><label className="label">الاسم *</label><input className="input-field" required value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} style={{ textAlign: 'right' }} /></div>
               <div className="grid grid-cols-2 gap-3">
@@ -494,7 +516,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
       {editEmp && (
         <div className="modal-backdrop" onClick={() => setEditEmp(null)}>
           <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-bold mb-1" style={{ color: '#00ffcc' }}>تعديل موظف</h2>
+            <h2 className="text-lg font-bold mb-1" style={{ color: '#D6A84F' }}>تعديل موظف</h2>
             <div className="space-y-3">
               <div><label className="label">الاسم</label><input className="input-field" value={editForm.full_name} onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })} style={{ textAlign: 'right' }} /></div>
               <div className="grid grid-cols-2 gap-3">
@@ -518,7 +540,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
       {showPanelGate && (
         <div className="modal-backdrop" onClick={() => setShowPanelGate(false)}>
           <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-bold mb-2" style={{ color: '#00ffcc' }}>لوحة التحكم</h2>
+            <h2 className="text-lg font-bold mb-2" style={{ color: '#D6A84F' }}>لوحة التحكم</h2>
             <input type="password" className="input-field mb-3" value={panelPwd} onChange={(e) => setPanelPwd(e.target.value)} dir="ltr" placeholder="" autoComplete="off" />
             <button disabled={panelBusy} onClick={verifyPanel} className="btn-primary w-full mb-2">{panelBusy ? '...' : 'دخول'}</button>
             <button onClick={() => setShowPanelGate(false)} className="btn-secondary w-full">إلغاء</button>
@@ -529,7 +551,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
       {panelOpen && (
         <div className="modal-backdrop" onClick={() => setPanelOpen(false)}>
           <div className="modal-panel" style={{ maxWidth: 520, maxHeight: '92vh' }} onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-bold mb-3" style={{ color: '#00ffcc' }}>لوحة التحكم</h2>
+            <h2 className="text-lg font-bold mb-3" style={{ color: '#D6A84F' }}>لوحة التحكم</h2>
             <div className="flex gap-1.5 mb-4 flex-wrap">
               {([
                 ['employees', 'الموظفون'],
@@ -538,14 +560,14 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
                 ['rates', 'الصرف'],
                 ['account', 'الحساب'],
               ] as const).map(([id, label]) => (
-                <button key={id} onClick={() => setPanelTab(id as typeof panelTab)} className="px-2.5 py-1.5 rounded-xl text-xs" style={{ background: panelTab === id ? 'rgba(0,255,204,0.15)' : 'rgba(15,30,50,0.9)', color: panelTab === id ? '#00ffcc' : '#8ab4f8', border: panelTab === id ? '1px solid rgba(0,255,204,0.45)' : '1px solid transparent' }}>{label}</button>
+                <button key={id} onClick={() => setPanelTab(id as typeof panelTab)} className="px-2.5 py-1.5 rounded-xl text-xs" style={{ background: panelTab === id ? 'rgba(214,168,79,0.15)' : 'rgba(16,24,32,0.9)', color: panelTab === id ? '#F1CE83' : '#A8B3C2', border: panelTab === id ? '1px solid rgba(214,168,79,0.45)' : '1px solid transparent' }}>{label}</button>
               ))}
             </div>
             {panelTab === 'employees' && (
               <div className="space-y-2 max-h-80 overflow-y-auto">
                 {employees.filter((e) => e.status === 'active').map((emp) => (
                   <div key={emp.id} className="card flex items-center justify-between gap-2" style={{ padding: 12 }}>
-                    <div><p className="text-sm text-white font-medium">{emp.full_name}</p><p className="text-xs text-[#5a7a9a]">#{emp.employee_number}</p></div>
+                    <div><p className="text-sm text-white font-medium">{emp.full_name}</p><p className="text-xs text-[#7A8696]">#{emp.employee_number}</p></div>
                     <div className="flex gap-1.5">
                       <button onClick={() => openEdit(emp)} className="text-xs px-2.5 py-1.5 rounded-lg btn-secondary">تعديل</button>
                       <button onClick={() => deleteEmployee(emp)} className="text-xs px-2.5 py-1.5 rounded-lg btn-danger">حذف</button>
@@ -608,7 +630,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
                   router.push('/login')
                 }}
                 className="w-full py-2.5 rounded-xl text-sm font-bold"
-                style={{ background: 'rgba(255,51,51,0.12)', border: '2px solid #ff3333', color: '#ff6b6b' }}
+                style={{ background: 'rgba(220,38,38,0.12)', border: '2px solid #DC2626', color: '#F87171' }}
               >
                 خروج من الحساب
               </button>
