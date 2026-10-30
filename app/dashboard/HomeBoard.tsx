@@ -53,10 +53,11 @@ function currencyLabel(c: string) {
 
 function normalizeWhatsApp(phone: string | null | undefined) {
   if (!phone) return ''
-  let p = String(phone).replace(/\D/g, '')
-  if (!p) return ''
-  if (p.startsWith('00')) p = p.slice(2)
-  if (p.startsWith('0')) p = '963' + p.slice(1)
+  let raw = String(phone).trim()
+  raw = raw.replace(/[\s\-().]/g, '')
+  if (raw.startsWith('00')) raw = raw.slice(2)
+  if (raw.startsWith('+')) raw = raw.slice(1)
+  const p = raw.replace(/\D/g, '')
   return p
 }
 
@@ -122,6 +123,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([])
   const [weekData, setWeekData] = useState<WeekDay[]>([])
   const [activeNav, setActiveNav] = useState('home')
+  const [openSelect, setOpenSelect] = useState<null | 'emp' | 'cur'>(null)
 
   useEffect(() => {
     try {
@@ -321,19 +323,9 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
     setDeleting(false)
   }
 
-  const openControlPanel = async () => {
-    let unlocked = false
-    try { unlocked = localStorage.getItem('csp_panel_unlocked') === '1' } catch {}
-    if (unlocked) {
-      setPanelOpen(true); setShowPanelGate(false)
-      try {
-        const s = await fetch('/api/admin/settings').then((r) => r.json())
-        setNewEmail(s.email || ''); setCafeName(s.cafe_name || ''); setRateSyp(s.rate_syp_per_usd || '15000'); setRateTry(s.rate_try_per_usd || '34')
-        try { const sa = await fetch('/api/super-admin/tenants'); setIsSuperAdmin(sa.ok) } catch { setIsSuperAdmin(false) }
-      } catch {}
-      return
-    }
-    setShowPanelGate(true); setPanelPwd('')
+  const openControlPanel = () => {
+    setShowPanelGate(true)
+    setPanelPwd('')
   }
 
   const onLogoClick = () => {
@@ -350,7 +342,6 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
       const data = await res.json()
       if (!res.ok) showToast(false, data.error || 'فشل')
       else {
-        try { localStorage.setItem('csp_panel_unlocked', '1') } catch {}
         setShowPanelGate(false); setPanelOpen(true)
         const s = await fetch('/api/admin/settings').then((r) => r.json())
         setNewEmail(s.email || ''); setCafeName(s.cafe_name || ''); setRateSyp(s.rate_syp_per_usd || '15000'); setRateTry(s.rate_try_per_usd || '34')
@@ -466,7 +457,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
               <p className="text-[11px] m-0" style={{ color: 'var(--muted)' }}>{roleLabel}</p>
             </div>
           </div>
-          <button type="button" className="side-nav-item" style={{ color: '#ff7782' }} onClick={async () => { try { localStorage.removeItem('csp_panel_unlocked') } catch {}; await createClient().auth.signOut(); router.push('/login') }}>خروج من الحساب</button>
+          <button type="button" className="side-nav-item" style={{ color: '#ff7782' }} onClick={async () => { await createClient().auth.signOut(); router.push('/login') }}>خروج من الحساب</button>
         </div>
       </aside>
 
@@ -581,7 +572,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
                 <div><label className="label">الرقم *</label><input className="input-field" required value={form.employee_number} onChange={(e) => setForm({ ...form, employee_number: e.target.value })} dir="ltr" /></div>
                 <div><label className="label">الراتب $</label><input className="input-field" type="number" value={form.salary_amount} onChange={(e) => setForm({ ...form, salary_amount: e.target.value })} dir="ltr" /></div>
               </div>
-              <div><label className="label">واتساب</label><input className="input-field" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} dir="ltr" placeholder="09xxxxxxxx" style={{ textAlign: 'left' }} /></div>
+              <div><label className="label">واتساب / هاتف دولي</label><input className="input-field" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} dir="ltr" placeholder="+90 5xx xxx xxxx" style={{ textAlign: 'left' }} /></div>
               <div className="flex gap-2"><button type="submit" disabled={saving} className="btn-gold flex-1">{saving ? '...' : 'حفظ'}</button><button type="button" onClick={() => setShowAdd(false)} className="btn-dark">إلغاء</button></div>
             </form>
           </div>
@@ -598,7 +589,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
                 <div><label className="label">الراتب $</label><input className="input-field" type="number" value={editForm.salary_amount} onChange={(e) => setEditForm({ ...editForm, salary_amount: e.target.value })} dir="ltr" /></div>
                 <div><label className="label">ساعات/يوم</label><input className="input-field" type="number" value={editForm.work_hours_per_day} onChange={(e) => setEditForm({ ...editForm, work_hours_per_day: e.target.value })} dir="ltr" /></div>
               </div>
-              <div><label className="label">واتساب</label><input className="input-field" value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} dir="ltr" placeholder="09xxxxxxxx" style={{ textAlign: 'left' }} /></div>
+              <div><label className="label">واتساب / هاتف دولي</label><input className="input-field" value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} dir="ltr" placeholder="+90 5xx xxx xxxx" style={{ textAlign: 'left' }} /></div>
               <div className="flex gap-2"><button onClick={saveEdit} disabled={editSaving} className="btn-gold flex-1">{editSaving ? '...' : 'حفظ'}</button><button onClick={() => setEditEmp(null)} className="btn-dark">إلغاء</button></div>
               <button type="button" className="btn-dark w-full" onClick={() => setShowQrEmp(editEmp)}>عرض QR الموظف</button>
               <button onClick={() => requestDelete(editEmp)} className="w-full btn-danger">حذف الموظف</button>
@@ -615,7 +606,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
         <div className="modal-backdrop" style={{ zIndex: 60 }} onClick={() => setShowPanelGate(false)}>
           <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
             <h3 className="m-0 mb-3 font-black" style={{ color: 'var(--gold2)' }}>لوحة التحكم</h3>
-            <input type="password" className="input-field mb-3" value={panelPwd} onChange={(e) => setPanelPwd(e.target.value)} dir="ltr" placeholder="" autoComplete="off" />
+            <input type="password" className="input-field mb-3" value={panelPwd} onChange={(e) => setPanelPwd(e.target.value)} dir="ltr" placeholder="كلمة السر" autoComplete="off" />
             <button disabled={panelBusy} onClick={verifyPanel} className="btn-gold w-full mb-2">{panelBusy ? '...' : 'دخول'}</button>
             <button onClick={() => setShowPanelGate(false)} className="btn-dark w-full">إلغاء</button>
           </div>
@@ -623,12 +614,12 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
       )}
 
       {panelOpen && (
-        <div className="modal-backdrop" style={{ zIndex: 60 }} onClick={() => setPanelOpen(false)}>
+        <div className="modal-backdrop" style={{ zIndex: 60 }} onClick={() => { setOpenSelect(null); setPanelOpen(false) }}>
           <div className="modal-panel" style={{ maxWidth: 520, maxHeight: '92vh' }} onClick={(e) => e.stopPropagation()}>
             <h3 className="m-0 mb-3 font-black" style={{ color: 'var(--gold2)' }}>لوحة التحكم</h3>
             <div className="flex gap-1.5 mb-4 flex-wrap">
               {([['employees', 'الموظفون'], ...(isSuperAdmin ? [['cafes', 'الحسابات'] as const] : []), ['withdrawals', 'السحوبات'], ['rates', 'الصرف'], ['account', 'الحساب']] as const).map(([id, label]) => (
-                <button key={id} onClick={() => setPanelTab(id as typeof panelTab)} className="px-2.5 py-1.5 rounded-xl text-xs" style={{ background: panelTab === id ? 'rgba(214,163,75,.18)' : '#111920', color: panelTab === id ? 'var(--gold2)' : 'var(--muted)', border: panelTab === id ? '1px solid var(--line)' : '1px solid transparent' }}>{label}</button>
+                <button key={id} onClick={() => { setPanelTab(id as typeof panelTab); setOpenSelect(null) }} className="px-2.5 py-1.5 rounded-xl text-xs" style={{ background: panelTab === id ? 'rgba(214,163,75,.18)' : '#111920', color: panelTab === id ? 'var(--gold2)' : 'var(--muted)', border: panelTab === id ? '1px solid var(--line)' : '1px solid transparent' }}>{label}</button>
               ))}
             </div>
             {panelTab === 'employees' && (
@@ -644,13 +635,37 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
             {panelTab === 'cafes' && isSuperAdmin && <TenantsTab onToast={showToast} />}
             {panelTab === 'withdrawals' && (
               <div className="space-y-3">
-                <select className="input-field" value={wForm.employee_id} onChange={(e) => setWForm({ ...wForm, employee_id: e.target.value })} style={{ textAlign: 'right' }}>
-                  <option value="">اختر موظف</option>
-                  {employees.filter((e) => e.status === 'active').map((e) => <option key={e.id} value={e.id}>{e.full_name}{e.phone ? ` (${e.phone})` : ''}</option>)}
-                </select>
+                <div className="relative">
+                  <button type="button" className="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-sm text-right" style={{ background: '#0c1218', border: '1px solid rgba(214,163,75,.45)', color: '#f3e5c7' }} onClick={() => setOpenSelect(openSelect === 'emp' ? null : 'emp')}>
+                    <span style={{ color: 'var(--gold2)', fontSize: 12 }}>▾</span>
+                    <span className="flex-1 truncate">{wForm.employee_id ? (employees.find((x) => x.id === wForm.employee_id)?.full_name || 'موظف') + (employees.find((x) => x.id === wForm.employee_id)?.phone ? ` · ${employees.find((x) => x.id === wForm.employee_id)?.phone}` : '') : 'اختر موظف'}</span>
+                  </button>
+                  {openSelect === 'emp' && (
+                    <div className="absolute z-20 left-0 right-0 mt-1 max-h-52 overflow-y-auto rounded-xl shadow-xl" style={{ background: '#0e151c', border: '1px solid rgba(214,163,75,.5)', boxShadow: '0 12px 40px rgba(0,0,0,.55)' }}>
+                      <button type="button" className="w-full text-right px-3 py-2.5 text-sm" style={{ color: 'var(--muted)', borderBottom: '1px solid rgba(214,163,75,.12)' }} onClick={() => { setWForm({ ...wForm, employee_id: '' }); setOpenSelect(null) }}>اختر موظف</button>
+                      {employees.filter((e) => e.status === 'active').map((e) => (
+                        <button key={e.id} type="button" className="w-full text-right px-3 py-2.5 text-sm" style={{ color: wForm.employee_id === e.id ? 'var(--gold2)' : '#e8eef2', background: wForm.employee_id === e.id ? 'rgba(214,163,75,.12)' : 'transparent', borderBottom: '1px solid rgba(214,163,75,.08)' }} onClick={() => { setWForm({ ...wForm, employee_id: e.id }); setOpenSelect(null) }}>
+                          {e.full_name}{e.phone ? ` · ${e.phone}` : ''}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <div className="grid grid-cols-2 gap-2">
-                  <input className="input-field" type="number" placeholder="المبلغ" value={wForm.amount} onChange={(e) => setWForm({ ...wForm, amount: e.target.value })} dir="ltr" />
-                  <select className="input-field" value={wForm.currency} onChange={(e) => setWForm({ ...wForm, currency: e.target.value })}><option value="USD">USD</option><option value="SYP">SYP</option><option value="TRY">TRY</option></select>
+                  <input className="input-field" type="text" inputMode="decimal" placeholder="المبلغ" value={wForm.amount} onChange={(e) => setWForm({ ...wForm, amount: e.target.value })} dir="ltr" />
+                  <div className="relative">
+                    <button type="button" className="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-sm" style={{ background: '#0c1218', border: '1px solid rgba(214,163,75,.45)', color: '#f3e5c7' }} onClick={() => setOpenSelect(openSelect === 'cur' ? null : 'cur')}>
+                      <span style={{ color: 'var(--gold2)', fontSize: 12 }}>▾</span>
+                      <span>{wForm.currency}</span>
+                    </button>
+                    {openSelect === 'cur' && (
+                      <div className="absolute z-20 left-0 right-0 mt-1 rounded-xl overflow-hidden shadow-xl" style={{ background: '#0e151c', border: '1px solid rgba(214,163,75,.5)' }}>
+                        {(['USD', 'SYP', 'TRY'] as const).map((c) => (
+                          <button key={c} type="button" className="w-full text-right px-3 py-2.5 text-sm" style={{ color: wForm.currency === c ? 'var(--gold2)' : '#e8eef2', background: wForm.currency === c ? 'rgba(214,163,75,.12)' : 'transparent', borderBottom: '1px solid rgba(214,163,75,.08)' }} onClick={() => { setWForm({ ...wForm, currency: c }); setOpenSelect(null) }}>{c}</button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <button className="btn-gold w-full text-sm" disabled={panelBusy} onClick={async () => {
                   setPanelBusy(true)
@@ -692,8 +707,8 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
               </div>
             )}
             <div className="mt-4 space-y-2">
-              <button onClick={() => setPanelOpen(false)} className="btn-dark w-full">إغلاق اللوحة</button>
-              <button onClick={async () => { setPanelOpen(false); try { localStorage.removeItem('csp_panel_unlocked') } catch {}; await createClient().auth.signOut(); router.push('/login') }} className="w-full btn-danger">خروج من الحساب</button>
+              <button onClick={() => { setOpenSelect(null); setPanelOpen(false) }} className="btn-dark w-full">إغلاق اللوحة</button>
+              <button onClick={async () => { setPanelOpen(false); await createClient().auth.signOut(); router.push('/login') }} className="w-full btn-danger">خروج من الحساب</button>
             </div>
           </div>
         </div>
