@@ -11,6 +11,7 @@ type TenantRow = {
   employee_count: number
   created_at: string
   is_protected?: boolean
+  is_platform_admin?: boolean
 }
 
 export default function TenantsTab({ onToast }: { onToast: (ok: boolean, msg: string) => void }) {
@@ -243,6 +244,9 @@ export default function TenantsTab({ onToast }: { onToast: (ok: boolean, msg: st
                     {t.is_protected ? (
                       <span className="text-[10px] text-amber-400 mr-2">محمي</span>
                     ) : null}
+                    {t.is_platform_admin ? (
+                      <span className="text-[10px] text-purple-300 mr-2">أدمن</span>
+                    ) : null}
                   </p>
                   <p className="text-xs text-zinc-500">
                     {t.owner_name || '—'} · {t.owner_email || 'بدون إيميل'}
@@ -295,6 +299,38 @@ export default function TenantsTab({ onToast }: { onToast: (ok: boolean, msg: st
                         تشغيل
                       </button>
                     ))}
+                  {!t.is_platform_admin && t.owner_email && (
+                    <button
+                      disabled={busyId === t.id}
+                      onClick={async () => {
+                        setBusyId(t.id)
+                        try {
+                          const res = await fetch('/api/super-admin/tenants', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ tenant_id: t.id, action: 'make_platform_admin' }),
+                          })
+                          const data = await res.json()
+                          if (!res.ok) onToast(false, data.error || 'فشل')
+                          else {
+                            onToast(true, data.message || 'تم')
+                            await load()
+                          }
+                        } catch {
+                          onToast(false, 'خطأ اتصال')
+                        }
+                        setBusyId(null)
+                      }}
+                      className="text-xs px-2.5 py-1.5 rounded-lg"
+                      style={{
+                        background: 'rgba(168,85,247,0.15)',
+                        color: '#d8b4fe',
+                        border: '1px solid rgba(168,85,247,0.35)',
+                      }}
+                    >
+                      جعله أدمن
+                    </button>
+                  )}
                   {!t.is_protected && (
                     <button
                       disabled={busyId === t.id}
