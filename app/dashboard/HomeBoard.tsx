@@ -71,6 +71,8 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
   const [editEmp, setEditEmp] = useState<Employee | null>(null)
   const [editForm, setEditForm] = useState({ full_name: '', salary_amount: '', work_hours_per_day: '8', job_title: '', pin_code: '', notes: '' })
   const [editSaving, setEditSaving] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<Employee | null>(null)
+  const [deleting, setDeleting] = useState(false)
   const logoClicks = useRef({ n: 0, t: 0 })
   const [showPanelGate, setShowPanelGate] = useState(false)
   const [panelOpen, setPanelOpen] = useState(false)
@@ -106,6 +108,15 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
     setToast({ ok, msg })
     setTimeout(() => setToast(null), 2500)
   }
+
+  const overlayOpen = panelOpen || showPanelGate || !!editEmp || showAdd || !!deleteTarget || mobileOpen || reportLoading || !!fullReport
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+    const prev = document.body.style.overflow
+    if (overlayOpen) document.body.style.overflow = 'hidden'
+    else document.body.style.overflow = prev || ''
+    return () => { document.body.style.overflow = prev || '' }
+  }, [overlayOpen])
 
   useEffect(() => {
     try {
@@ -270,14 +281,23 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
     } catch { showToast(false, 'خطأ') }
     setEditSaving(false)
   }
-  const deleteEmployee = async (emp: Employee) => {
-    if (!confirm(`حذف «${emp.full_name}»؟`)) return
+  const requestDelete = (emp: Employee) => setDeleteTarget(emp)
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return
+    setDeleting(true)
     try {
-      const res = await fetch(`/api/employees/${emp.id}`, { method: 'DELETE' })
+      const res = await fetch(`/api/employees/${deleteTarget.id}`, { method: 'DELETE' })
       const data = await res.json()
       if (!res.ok) showToast(false, data.error || 'فشل')
-      else { showToast(true, 'تم الحذف'); setEditEmp(null); load() }
+      else {
+        showToast(true, 'تم الحذف')
+        setEditEmp(null)
+        setDeleteTarget(null)
+        load()
+      }
     } catch { showToast(false, 'خطأ') }
+    setDeleting(false)
   }
   const onLogoClick = () => {
     const now = Date.now()
@@ -603,7 +623,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
       </div>
 
       {showAdd && (
-        <div className="modal-backdrop" onClick={() => setShowAdd(false)}>
+        <div className="modal-backdrop" style={{ zIndex: 70 }} onClick={() => setShowAdd(false)}>
           <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
             <h3 className="m-0 mb-4 font-black" style={{ color: 'var(--gold2)' }}>＋ إضافة موظف جديد</h3>
             <form onSubmit={addEmployee} className="space-y-3">
@@ -619,7 +639,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
       )}
 
       {editEmp && (
-        <div className="modal-backdrop" onClick={() => setEditEmp(null)}>
+        <div className="modal-backdrop" style={{ zIndex: 80 }} onClick={() => setEditEmp(null)}>
           <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
             <h3 className="m-0 mb-3 font-black" style={{ color: 'var(--gold2)' }}>تعديل موظف</h3>
             <div className="space-y-3">
@@ -629,7 +649,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
                 <div><label className="label">ساعات/يوم</label><input className="input-field" type="number" value={editForm.work_hours_per_day} onChange={(e) => setEditForm({ ...editForm, work_hours_per_day: e.target.value })} dir="ltr" /></div>
               </div>
               <div className="flex gap-2"><button onClick={saveEdit} disabled={editSaving} className="btn-gold flex-1">{editSaving ? '...' : 'حفظ'}</button><button onClick={() => setEditEmp(null)} className="btn-dark">إلغاء</button></div>
-              <button onClick={() => deleteEmployee(editEmp)} className="w-full btn-danger">حذف الموظف</button>
+              <button onClick={() => requestDelete(editEmp)} className="w-full btn-danger">حذف الموظف</button>
             </div>
           </div>
         </div>
@@ -640,7 +660,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
       )}
 
       {showPanelGate && (
-        <div className="modal-backdrop" onClick={() => setShowPanelGate(false)}>
+        <div className="modal-backdrop" style={{ zIndex: 60 }} onClick={() => setShowPanelGate(false)}>
           <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
             <h3 className="m-0 mb-3 font-black" style={{ color: 'var(--gold2)' }}>لوحة التحكم</h3>
             <input type="password" className="input-field mb-3" value={panelPwd} onChange={(e) => setPanelPwd(e.target.value)} dir="ltr" placeholder="" autoComplete="off" />
@@ -651,7 +671,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
       )}
 
       {panelOpen && (
-        <div className="modal-backdrop" onClick={() => setPanelOpen(false)}>
+        <div className="modal-backdrop" style={{ zIndex: 60 }} onClick={() => setPanelOpen(false)}>
           <div className="modal-panel" style={{ maxWidth: 520, maxHeight: '92vh' }} onClick={(e) => e.stopPropagation()}>
             <h3 className="m-0 mb-3 font-black" style={{ color: 'var(--gold2)' }}>لوحة التحكم</h3>
             <div className="flex gap-1.5 mb-4 flex-wrap">
@@ -664,7 +684,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
                 {employees.filter((e) => e.status === 'active').map((emp) => (
                   <div key={emp.id} className="card flex items-center justify-between gap-2" style={{ padding: 12 }}>
                     <div><p className="text-sm text-white font-medium m-0">{emp.full_name}</p><p className="text-xs m-0" style={{ color: 'var(--muted)' }}>#{emp.employee_number}</p></div>
-                    <div className="flex gap-1.5"><button onClick={() => openEdit(emp)} className="text-xs px-2.5 py-1.5 rounded-lg btn-dark">تعديل</button><button onClick={() => deleteEmployee(emp)} className="text-xs px-2.5 py-1.5 rounded-lg btn-danger">حذف</button></div>
+                    <div className="flex gap-1.5"><button onClick={() => openEdit(emp)} className="text-xs px-2.5 py-1.5 rounded-lg btn-dark">تعديل</button><button onClick={() => requestDelete(emp)} className="text-xs px-2.5 py-1.5 rounded-lg btn-danger">حذف</button></div>
                   </div>
                 ))}
               </div>
@@ -721,6 +741,29 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
             <div className="mt-4 space-y-2">
               <button onClick={() => setPanelOpen(false)} className="btn-dark w-full">إغلاق اللوحة</button>
               <button onClick={async () => { setPanelOpen(false); await createClient().auth.signOut(); router.push('/login') }} className="w-full btn-danger">خروج من الحساب</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteTarget && (
+        <div className="modal-backdrop" style={{ zIndex: 90 }} onClick={() => !deleting && setDeleteTarget(null)}>
+          <div className="modal-panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 380 }}>
+            <h3 className="m-0 mb-2 font-black text-center" style={{ color: 'var(--gold2)' }}>تأكيد الحذف</h3>
+            <p className="text-sm text-center m-0 mb-5" style={{ color: '#c8d0d6', lineHeight: 1.7 }}>
+              هل تريد حذف الموظف
+              <br />
+              <strong style={{ color: '#fff' }}>«{deleteTarget.full_name}»</strong>
+              <br />
+              <span style={{ color: 'var(--muted)', fontSize: 12 }}>لا يمكن التراجع عن هذا الإجراء</span>
+            </p>
+            <div className="flex gap-2">
+              <button type="button" disabled={deleting} onClick={confirmDelete} className="btn-danger flex-1">
+                {deleting ? '...' : 'حذف'}
+              </button>
+              <button type="button" disabled={deleting} onClick={() => setDeleteTarget(null)} className="btn-dark flex-1">
+                إلغاء
+              </button>
             </div>
           </div>
         </div>
