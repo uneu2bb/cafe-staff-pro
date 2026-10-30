@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import ReportModal from './ReportModal'
 import TenantsTab from './TenantsTab'
+import QrScanner, { EmployeeQrCard } from './QrPanel'
 
 type Employee = {
   id: string
@@ -85,6 +86,9 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
   const [toast, setToast] = useState<{ ok: boolean; msg: string } | null>(null)
   const [search, setSearch] = useState('')
   const [showAdd, setShowAdd] = useState(false)
+  const [showQrScan, setShowQrScan] = useState(false)
+  const [qrBusy, setQrBusy] = useState(false)
+  const [showQrEmp, setShowQrEmp] = useState<Employee | null>(null)
   const [fullReport, setFullReport] = useState<any | null>(null)
   const [reportLoading, setReportLoading] = useState(false)
   const [reportMonth, setReportMonth] = useState(() => {
@@ -115,6 +119,9 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
   const [saving, setSaving] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([])
+  const [weekData, setWeekData] = useState<WeekDay[]>([])
+  const [activeNav, setActiveNav] = useState('home')
 
   useEffect(() => {
     try {
@@ -123,16 +130,13 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
       if (v === '1') setSidebarOpen(true)
     } catch {}
   }, [])
-  const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([])
-  const [weekData, setWeekData] = useState<WeekDay[]>([])
-  const [activeNav, setActiveNav] = useState('home')
 
   const showToast = (ok: boolean, msg: string) => {
     setToast({ ok, msg })
     setTimeout(() => setToast(null), 2500)
   }
 
-  const overlayOpen = panelOpen || showPanelGate || !!editEmp || showAdd || !!deleteTarget || mobileOpen || reportLoading || !!fullReport
+  const overlayOpen = panelOpen || showPanelGate || !!editEmp || showAdd || !!deleteTarget || mobileOpen || reportLoading || !!fullReport || showQrScan || !!showQrEmp
   useEffect(() => {
     if (typeof document === 'undefined') return
     const prev = document.body.style.overflow
@@ -305,7 +309,6 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
     setEditSaving(false)
   }
   const requestDelete = (emp: Employee) => setDeleteTarget(emp)
-
   const confirmDelete = async () => {
     if (!deleteTarget) return
     setDeleting(true)
@@ -313,12 +316,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
       const res = await fetch(`/api/employees/${deleteTarget.id}`, { method: 'DELETE' })
       const data = await res.json()
       if (!res.ok) showToast(false, data.error || 'فشل')
-      else {
-        showToast(true, 'تم الحذف')
-        setEditEmp(null)
-        setDeleteTarget(null)
-        load()
-      }
+      else { showToast(true, 'تم الحذف'); setEditEmp(null); setDeleteTarget(null); load() }
     } catch { showToast(false, 'خطأ') }
     setDeleting(false)
   }
@@ -327,8 +325,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
     let unlocked = false
     try { unlocked = localStorage.getItem('csp_panel_unlocked') === '1' } catch {}
     if (unlocked) {
-      setPanelOpen(true)
-      setShowPanelGate(false)
+      setPanelOpen(true); setShowPanelGate(false)
       try {
         const s = await fetch('/api/admin/settings').then((r) => r.json())
         setNewEmail(s.email || ''); setCafeName(s.cafe_name || ''); setRateSyp(s.rate_syp_per_usd || '15000'); setRateTry(s.rate_try_per_usd || '34')
@@ -336,8 +333,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
       } catch {}
       return
     }
-    setShowPanelGate(true)
-    setPanelPwd('')
+    setShowPanelGate(true); setPanelPwd('')
   }
 
   const onLogoClick = () => {
@@ -346,6 +342,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
     logoClicks.current.n += 1; logoClicks.current.t = now
     if (logoClicks.current.n >= 5) { logoClicks.current.n = 0; openControlPanel() }
   }
+
   const verifyPanel = async () => {
     setPanelBusy(true)
     try {
@@ -362,6 +359,29 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
     } catch { showToast(false, 'خطأ') }
     setPanelBusy(false)
   }
+
+  const handleQrScan = useCallback(async (employeeId: string) => {
+    setQrBusy(true)
+    try {
+      const res = await fetch('/api/attendance/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ employee_id: employeeId, action: 'qr_toggle', method: 'qr' }),
+      })
+      const data = await res.json()
+      if (!res.ok || data.success === false) showToast(false, data.error || 'فشل المسح')
+      else {
+        showToast(true, data.message || 'تم')
+        if (data.action === 'check_in') {
+          setTodayMap((prev) => ({ ...prev, [employeeId]: { status: 'present', check_in_at: data.check_in_at, check_out_at: null, worked_minutes: null } }))
+        } else if (data.action === 'check_out') {
+          setTodayMap((prev) => ({ ...prev, [employeeId]: { status: 'checked_out', check_in_at: data.check_in_at, check_out_at: data.check_out_at, worked_minutes: data.worked_minutes } }))
+        }
+        load()
+      }
+    } catch { showToast(false, 'خطأ اتصال') }
+    setQrBusy(false)
+  }, [load])
 
   const stats = useMemo(() => {
     const active = employees.filter((e) => e.status === 'active')
@@ -422,7 +442,8 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
   const navGo = (id: string) => {
     setActiveNav(id); setMobileOpen(false)
     if (id === 'add') setShowAdd(true)
-    if (id === 'panel') { openControlPanel() }
+    if (id === 'qr') setShowQrScan(true)
+    if (id === 'panel') openControlPanel()
     if (id === 'home') window.scrollTo({ top: 0, behavior: 'smooth' })
     if (id === 'employees') document.getElementById('employees-section')?.scrollIntoView({ behavior: 'smooth' })
     if (id === 'withdrawals') document.getElementById('withdrawals-section')?.scrollIntoView({ behavior: 'smooth' })
@@ -436,17 +457,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
       {mobileOpen && <div className="fixed inset-0 z-[15] md:hidden" style={{ background: 'rgba(0,0,0,.58)' }} onClick={() => setMobileOpen(false)} />}
 
       <aside className={`csp-sidebar fixed top-0 h-screen z-20 flex flex-col${mobileOpen ? ' open' : ''}${!sidebarOpen ? ' collapsed' : ''}`} style={{ width: 264, padding: '24px 16px', background: 'linear-gradient(180deg,#0d1115,#080b0e 78%)', borderLeft: '1px solid var(--line)' }}>
-        <style>{`
-          aside.csp-sidebar{right:0;transition:transform .28s ease,box-shadow .28s ease;will-change:transform}
-          .csp-main-wrap{transition:margin-right .28s ease}
-          aside.csp-sidebar.collapsed{transform:translateX(110%)}
-          .csp-main-wrap.full{margin-right:0!important}
-          @media(max-width:768px){
-            aside.csp-sidebar{right:-285px;width:270px;transform:none;box-shadow:-15px 0 40px rgba(0,0,0,.5)}
-            aside.csp-sidebar.open{right:0}
-            .csp-main-wrap{margin-right:0!important}
-          }
-        `}</style>
+        <style>{`aside.csp-sidebar{right:0;transition:transform .28s ease,box-shadow .28s ease;will-change:transform}.csp-main-wrap{transition:margin-right .28s ease}aside.csp-sidebar.collapsed{transform:translateX(110%)}.csp-main-wrap.full{margin-right:0!important}@media(max-width:768px){aside.csp-sidebar{right:-285px;width:270px;transform:none;box-shadow:-15px 0 40px rgba(0,0,0,.5)}aside.csp-sidebar.open{right:0}.csp-main-wrap{margin-right:0!important}}`}</style>
         <button type="button" onClick={onLogoClick} className="flex items-center gap-3 px-2.5 pb-6 mb-1 w-full text-right" style={{ background: 'none', border: 'none', borderBottom: '1px solid rgba(214,163,75,.18)' }}>
           <div>
             <h1 className="text-[19px] font-black m-0 leading-tight" style={{ color: 'var(--gold2)' }}>{siteTitle}</h1>
@@ -454,7 +465,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
           </div>
         </button>
         <nav className="grid gap-2 mt-6 flex-1">
-          {[ { id: 'home', icon: '⌂', label: 'الرئيسية' }, { id: 'employees', icon: '♟', label: 'الموظفون' }, { id: 'add', icon: '＋', label: 'إضافة موظف' }, { id: 'withdrawals', icon: '＄', label: 'السحوبات' }, { id: 'panel', icon: '⚙', label: 'لوحة التحكم' } ].map((item) => (
+          {[ { id: 'home', icon: '⌂', label: 'الرئيسية' }, { id: 'employees', icon: '♟', label: 'الموظفون' }, { id: 'qr', icon: '▣', label: 'مسح QR' }, { id: 'add', icon: '＋', label: 'إضافة موظف' }, { id: 'withdrawals', icon: '＄', label: 'السحوبات' }, { id: 'panel', icon: '⚙', label: 'لوحة التحكم' } ].map((item) => (
             <button key={item.id} type="button" className={`side-nav-item ${activeNav === item.id ? 'active' : ''}`} onClick={() => navGo(item.id)}>
               <span className="text-[19px] w-6 text-center" style={{ color: activeNav === item.id ? undefined : 'var(--gold)' }}>{item.icon}</span>{item.label}
             </button>
@@ -480,47 +491,14 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
           </div>
           <div className="flex items-center gap-3 text-xs" style={{ color: '#d5d8da' }}>
             <span className="hidden sm:inline">{todayLabel()} · {clock}</span>
-            <button type="button" className="w-[38px] h-[38px] rounded-[11px] grid place-items-center" style={{ border: '1px solid var(--line)', background: '#11181d', color: 'var(--gold2)' }} onClick={() => showToast(true, 'لا توجد إشعارات جديدة')}>♧</button>
-            <button
-              type="button"
-              onClick={() => {
-                if (typeof window !== 'undefined' && window.innerWidth <= 768) {
-                  setMobileOpen((v) => !v)
-                } else {
-                  setSidebarOpen((prev) => {
-                    const next = !prev
-                    try { localStorage.setItem('csp_sidebar_open', next ? '1' : '0') } catch {}
-                    return next
-                  })
-                }
-              }}
-              title={sidebarOpen || mobileOpen ? 'إخفاء القائمة' : 'إظهار القائمة'}
-              className="grid place-items-center"
-              style={{
-                width: 42,
-                height: 42,
-                borderRadius: 12,
-                border: '1px solid rgba(214,163,75,0.55)',
-                background: 'linear-gradient(145deg, rgba(214,163,75,0.18), rgba(16,22,28,0.95))',
-                color: 'var(--gold2)',
-                boxShadow: '0 0 18px rgba(214,163,75,0.18)',
-                fontSize: 18,
-                fontWeight: 800,
-              }}
-            >
-              {sidebarOpen || mobileOpen ? '⟫' : '⟪'}
-            </button>
+            <button type="button" className="w-[38px] h-[38px] rounded-[11px] grid place-items-center" style={{ border: '1px solid var(--line)', background: '#11181d', color: 'var(--gold2)' }} onClick={() => setShowQrScan(true)} title="مسح QR">▣</button>
+            <button type="button" className="grid place-items-center" title={sidebarOpen || mobileOpen ? 'إخفاء القائمة' : 'إظهار القائمة'} onClick={() => { if (typeof window !== 'undefined' && window.innerWidth <= 768) setMobileOpen((v) => !v); else setSidebarOpen((prev) => { const next = !prev; try { localStorage.setItem('csp_sidebar_open', next ? '1' : '0') } catch {}; return next }) }} style={{ width: 42, height: 42, borderRadius: 12, border: '1px solid rgba(214,163,75,0.55)', background: 'linear-gradient(145deg, rgba(214,163,75,0.18), rgba(16,22,28,0.95))', color: 'var(--gold2)', boxShadow: '0 0 18px rgba(214,163,75,0.18)', fontSize: 18, fontWeight: 800 }}>{sidebarOpen || mobileOpen ? '⟫' : '⟪'}</button>
           </div>
         </header>
 
         <section className="max-w-[1600px] mx-auto px-3 md:px-7 py-5 md:py-6 space-y-4">
           <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            {[
-              { label: 'إجمالي الموظفين', value: stats.total, note: 'موظف مسجل', icon: '♟' },
-              { label: 'الحضور اليوم', value: stats.present, note: `من أصل ${stats.total}`, icon: '✓' },
-              { label: 'لم يبدأوا', value: stats.none, note: 'هذا اليوم', icon: '○' },
-              { label: 'يعملون الآن', value: stats.working, note: 'جلسة نشطة', icon: '⏱' },
-            ].map((s) => (
+            {[{ label: 'إجمالي الموظفين', value: stats.total, note: 'موظف مسجل', icon: '♟' }, { label: 'الحضور اليوم', value: stats.present, note: `من أصل ${stats.total}`, icon: '✓' }, { label: 'لم يبدأوا', value: stats.none, note: 'هذا اليوم', icon: '○' }, { label: 'يعملون الآن', value: stats.working, note: 'جلسة نشطة', icon: '⏱' }].map((s) => (
               <div key={s.label} className="stat">
                 <div>
                   <div className="text-[12px] md:text-[13px]" style={{ color: '#d0d4d7' }}>{s.label}</div>
@@ -532,133 +510,75 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
             ))}
           </section>
 
-          <section className="grid grid-cols-1 lg:grid-cols-[1.15fr_1fr] gap-3.5">
-            <div className="card">
-              <h3 className="m-0 mb-3 text-sm font-extrabold" style={{ color: '#f3e5c7' }}><span className="ml-1.5" style={{ color: 'var(--gold)' }}>◷</span> الحضور الأسبوعي</h3>
-              <div className="chart-wrap">
-                {(weekData.length ? weekData : DAY_NAMES.map((label) => ({ label, present: 0, absent: 0 }))).map((d) => (
-                  <div key={d.label} className="chart-col">
-                    <i className="bar" style={{ height: `${Math.max(8, (d.present / maxWeek) * 100)}%` }} />
-                    <i className="bar absent" style={{ height: `${Math.max(8, (d.absent / maxWeek) * 100)}%` }} />
-                    <b className="day">{d.label}</b>
-                  </div>
-                ))}
-              </div>
-              <div className="flex justify-center gap-4 mt-6 text-[11px]" style={{ color: '#bfc6ca' }}>
-                <span><i className="inline-block w-2.5 h-2.5 rounded-full ml-1" style={{ background: '#27a66e' }} />حاضر</span>
-                <span><i className="inline-block w-2.5 h-2.5 rounded-full ml-1" style={{ background: '#d9a64c' }} />غائب</span>
+          <section id="employees-section" className="card">
+            <div className="flex items-center justify-between gap-2 flex-wrap mb-3">
+              <h3 className="m-0 text-sm font-extrabold" style={{ color: '#f3e5c7' }}><span className="ml-1.5" style={{ color: 'var(--gold)' }}>♟</span> قائمة الموظفين</h3>
+              <div className="flex items-center gap-2 rounded-[11px] px-3 py-2 min-w-[200px] flex-1 sm:flex-none" style={{ border: '1px solid var(--line)', background: '#080e13' }}>
+                <span>⌕</span>
+                <input className="bg-transparent border-0 outline-none text-white text-xs w-full" placeholder="ابحث عن موظف..." value={search} onChange={(e) => setSearch(e.target.value)} style={{ textAlign: 'right' }} />
               </div>
             </div>
-            <div className="card">
-              <h3 className="m-0 mb-3 text-sm font-extrabold" style={{ color: '#f3e5c7' }}><span className="ml-1.5" style={{ color: 'var(--gold)' }}>◷</span> آخر النشاطات</h3>
-              <div className="grid gap-0">
-                {activities.length === 0 && <p className="text-xs text-center py-6" style={{ color: 'var(--muted)' }}>لا يوجد نشاط اليوم بعد</p>}
-                {activities.map((a, i) => (
-                  <div key={i} className="grid items-center gap-2 py-2.5 text-[11px]" style={{ gridTemplateColumns: '62px 1fr auto', borderBottom: '1px solid rgba(160,170,180,.12)' }}>
-                    <span style={{ color: '#aab4bc' }} dir="ltr">{a.time}</span>
-                    <span style={{ color: '#d8dde0' }}>{a.text}</span>
-                    <b className={`pill ${a.type === 'سحب' ? 'orange' : a.type === 'انصراف' ? 'blue' : ''}`}>{a.type}</b>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
-
-          <section id="employees-section" className="grid grid-cols-1 xl:grid-cols-[1fr_240px] gap-3.5">
-            <div className="card">
-              <div className="flex items-center justify-between gap-2 flex-wrap mb-3">
-                <h3 className="m-0 text-sm font-extrabold" style={{ color: '#f3e5c7' }}><span className="ml-1.5" style={{ color: 'var(--gold)' }}>♟</span> قائمة الموظفين</h3>
-                <div className="flex items-center gap-2 rounded-[11px] px-3 py-2 min-w-[200px] flex-1 sm:flex-none" style={{ border: '1px solid var(--line)', background: '#080e13' }}>
-                  <span>⌕</span>
-                  <input className="bg-transparent border-0 outline-none text-white text-xs w-full" placeholder="ابحث عن موظف..." value={search} onChange={(e) => setSearch(e.target.value)} style={{ textAlign: 'right' }} />
-                </div>
-              </div>
-              {loading ? <p className="text-center py-10 text-sm" style={{ color: 'var(--muted)' }}>جاري التحميل...</p> : (
-                <div className="overflow-x-auto rounded-[10px]" style={{ border: '1px solid rgba(214,163,75,.22)' }}>
-                  <table className="w-full text-[11px]" style={{ borderCollapse: 'collapse', minWidth: 720 }}>
-                    <thead><tr style={{ background: '#151e24' }}>{['#', 'الموظف', 'الوظيفة', 'الراتب', 'الحالة', 'الحضور', 'الانصراف', 'الساعة', 'إجراءات'].map((h) => (<th key={h} className="px-2 py-2.5 whitespace-nowrap font-bold" style={{ color: '#e5d4ad' }}>{h}</th>))}</tr></thead>
-                    <tbody>
-                      {filtered.map((emp, idx) => {
-                        const day = todayMap[emp.id]
-                        const sess = sessions[emp.id]
-                        const elapsed = getElapsedLabel(emp.id)
-                        let statusLabel = 'لم يسجل', pillCls = 'gold'
-                        if (sess?.running) { statusLabel = 'يعمل'; pillCls = '' }
-                        else if (sess && !sess.running) { statusLabel = 'متوقف'; pillCls = 'orange' }
-                        else if (day?.check_in_at && day?.check_out_at) { statusLabel = 'محفوظ'; pillCls = 'blue' }
-                        else if (day?.check_in_at) { statusLabel = 'حاضر'; pillCls = '' }
-                        return (
-                          <tr key={emp.id}>
-                            <td className="px-2 py-2 text-center" style={{ borderTop: '1px solid rgba(180,190,200,.12)', color: '#dce1e4' }}>{idx + 1}</td>
-                            <td className="px-2 py-2" style={{ borderTop: '1px solid rgba(180,190,200,.12)' }}><div className="flex items-center gap-2"><span className="w-7 h-7 rounded-full grid place-items-center text-xs" style={{ background: '#29343b', border: '1px solid #6d7376' }}>{emp.full_name.charAt(0)}</span><span className="text-white font-medium">{emp.full_name}</span></div></td>
-                            <td className="px-2 py-2 text-center" style={{ borderTop: '1px solid rgba(180,190,200,.12)', color: '#dce1e4' }}>{emp.job_title || '—'}</td>
-                            <td className="px-2 py-2 text-center" style={{ borderTop: '1px solid rgba(180,190,200,.12)', color: 'var(--gold2)' }}>${Number(emp.salary_amount || 0).toFixed(0)}</td>
-                            <td className="px-2 py-2 text-center" style={{ borderTop: '1px solid rgba(180,190,200,.12)' }}><span className={`pill ${pillCls}`}>{statusLabel}</span></td>
-                            <td className="px-2 py-2 text-center" dir="ltr" style={{ borderTop: '1px solid rgba(180,190,200,.12)', color: '#dce1e4' }}>{sess ? fmtTime(new Date(sess.startMs).toISOString()) : fmtTime(day?.check_in_at || null)}</td>
-                            <td className="px-2 py-2 text-center" dir="ltr" style={{ borderTop: '1px solid rgba(180,190,200,.12)', color: '#dce1e4' }}>{sess?.endMs ? fmtTime(new Date(sess.endMs).toISOString()) : fmtTime(day?.check_out_at || null)}</td>
-                            <td className="px-2 py-2 text-center font-bold" dir="ltr" style={{ borderTop: '1px solid rgba(180,190,200,.12)', color: sess?.running ? '#55d39d' : '#dce1e4' }}>{elapsed || (day?.worked_minutes != null ? `${Math.floor(day.worked_minutes / 60)}:${String(day.worked_minutes % 60).padStart(2, '0')}` : '—')}</td>
-                            <td className="px-2 py-2" style={{ borderTop: '1px solid rgba(180,190,200,.12)' }}>
-                              <div className="flex justify-center gap-1 flex-wrap">
-                                <button type="button" disabled={!!busyId || !!sess?.running || !!(day?.check_in_at && day?.check_out_at)} onClick={() => startSession(emp.id)} className="px-1.5 py-1 rounded text-[10px] font-bold" style={{ border: '1px solid #16a36b', background: '#121a20', color: '#55d39d', opacity: sess?.running || (day?.check_in_at && day?.check_out_at) ? 0.4 : 1 }}>حضور</button>
-                                <button type="button" disabled={!!busyId || !sess?.running} onClick={() => stopSession(emp.id)} className="px-1.5 py-1 rounded text-[10px] font-bold" style={{ border: '1px solid #d83e4d', background: '#121a20', color: '#ff7782', opacity: !sess?.running ? 0.4 : 1 }}>انصراف</button>
-                                <button type="button" disabled={!!busyId || !sess || sess.running} onClick={() => saveSession(emp.id)} className="px-1.5 py-1 rounded text-[10px] font-bold" style={{ border: '1px solid var(--line)', background: '#121a20', color: 'var(--gold2)', opacity: !sess || sess.running ? 0.4 : 1 }}>{busyId === emp.id ? '...' : 'حفظ'}</button>
-                                <button type="button" onClick={() => openEdit(emp)} className="px-1.5 py-1 rounded text-[10px]" style={{ border: '1px solid var(--line)', background: '#121a20', color: 'var(--gold2)' }}>✎</button>
-                                <button type="button" onClick={() => generateReport(emp.id)} className="px-1.5 py-1 rounded text-[10px]" style={{ border: '1px solid var(--line)', background: '#121a20', color: 'var(--gold2)' }}>تقرير</button>
-                              </div>
-                            </td>
-                          </tr>
-                        )
-                      })}
-                      {!filtered.length && <tr><td colSpan={9} className="text-center py-8" style={{ color: 'var(--muted)' }}>لا يوجد موظفون</td></tr>}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-            <aside className="card">
-              <h3 className="m-0 mb-3 text-sm font-extrabold" style={{ color: '#f3e5c7' }}><span className="ml-1.5" style={{ color: 'var(--gold)' }}>♟</span> إحصائيات سريعة</h3>
-              <div className="grid gap-2">
-                {[{ label: 'إجمالي الموظفين', value: stats.total, icon: '♟' }, { label: 'الحضور اليوم', value: stats.present, icon: '✓' }, { label: 'لم يبدأوا', value: stats.none, icon: '○' }, { label: 'يعملون الآن', value: stats.working, icon: '⏱' }, { label: 'محفوظ اليوم', value: stats.saved, icon: '✓' }].map((q) => (
-                  <div key={q.label} className="flex items-center justify-between rounded-[10px] p-2.5" style={{ border: '1px solid rgba(214,163,75,.27)', background: '#0a1015' }}>
-                    <div><small className="block text-[10px]" style={{ color: '#aeb8bf' }}>{q.label}</small><strong className="text-lg" style={{ color: 'var(--gold2)' }}>{q.value}</strong></div>
-                    <span className="w-[38px] h-[38px] rounded-full grid place-items-center text-[17px]" style={{ border: '1px solid var(--line)', color: 'var(--gold)' }}>{q.icon}</span>
-                  </div>
-                ))}
-              </div>
-            </aside>
-          </section>
-
-          <section id="withdrawals-section" className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-            <div className="card">
-              <h3 className="m-0 mb-3 text-sm font-extrabold" style={{ color: '#f3e5c7' }}><span className="ml-1.5" style={{ color: 'var(--gold)' }}>＄</span> أحدث السحوبات</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-[11px]" style={{ minWidth: 320, borderCollapse: 'collapse' }}>
-                  <thead><tr style={{ background: '#151e24' }}>{['الموظف', 'المبلغ', 'العملة', 'الوقت'].map((h) => (<th key={h} className="px-2 py-2 text-center font-bold" style={{ color: '#e5d4ad' }}>{h}</th>))}</tr></thead>
+            {loading ? <p className="text-center py-10 text-sm" style={{ color: 'var(--muted)' }}>جاري التحميل...</p> : (
+              <div className="overflow-x-auto rounded-[10px]" style={{ border: '1px solid rgba(214,163,75,.22)' }}>
+                <table className="w-full text-[11px]" style={{ borderCollapse: 'collapse', minWidth: 720 }}>
+                  <thead><tr style={{ background: '#151e24' }}>{['#', 'الموظف', 'الوظيفة', 'الراتب', 'الحالة', 'الحضور', 'الانصراف', 'الساعة', 'إجراءات'].map((h) => (<th key={h} className="px-2 py-2.5 whitespace-nowrap font-bold" style={{ color: '#e5d4ad' }}>{h}</th>))}</tr></thead>
                   <tbody>
-                    {withdrawals.slice(0, 8).map((w) => (
-                      <tr key={w.id}>
-                        <td className="px-2 py-2 text-center" style={{ borderTop: '1px solid rgba(180,190,200,.12)', color: '#dce1e4' }}>{empNameById[w.employee_id] || '—'}</td>
-                        <td className="px-2 py-2 text-center" style={{ borderTop: '1px solid rgba(180,190,200,.12)', color: 'var(--gold2)' }}>{Number(w.amount).toLocaleString()}</td>
-                        <td className="px-2 py-2 text-center" style={{ borderTop: '1px solid rgba(180,190,200,.12)', color: '#dce1e4' }}>{w.currency}</td>
-                        <td className="px-2 py-2 text-center" dir="ltr" style={{ borderTop: '1px solid rgba(180,190,200,.12)', color: '#dce1e4' }}>{fmtTime(w.withdrawn_at)}</td>
-                      </tr>
-                    ))}
-                    {!withdrawals.length && <tr><td colSpan={4} className="text-center py-6" style={{ color: 'var(--muted)' }}>لا توجد سحوبات</td></tr>}
+                    {filtered.map((emp, idx) => {
+                      const day = todayMap[emp.id]
+                      const sess = sessions[emp.id]
+                      const elapsed = getElapsedLabel(emp.id)
+                      let statusLabel = 'لم يسجل', pillCls = 'gold'
+                      if (sess?.running) { statusLabel = 'يعمل'; pillCls = '' }
+                      else if (sess && !sess.running) { statusLabel = 'متوقف'; pillCls = 'orange' }
+                      else if (day?.check_in_at && day?.check_out_at) { statusLabel = 'محفوظ'; pillCls = 'blue' }
+                      else if (day?.check_in_at) { statusLabel = 'حاضر'; pillCls = '' }
+                      return (
+                        <tr key={emp.id}>
+                          <td className="px-2 py-2 text-center" style={{ borderTop: '1px solid rgba(180,190,200,.12)', color: '#dce1e4' }}>{idx + 1}</td>
+                          <td className="px-2 py-2" style={{ borderTop: '1px solid rgba(180,190,200,.12)' }}><div className="flex items-center gap-2"><span className="w-7 h-7 rounded-full grid place-items-center text-xs" style={{ background: '#29343b', border: '1px solid #6d7376' }}>{emp.full_name.charAt(0)}</span><span className="text-white font-medium">{emp.full_name}</span></div></td>
+                          <td className="px-2 py-2 text-center" style={{ borderTop: '1px solid rgba(180,190,200,.12)', color: '#dce1e4' }}>{emp.job_title || '—'}</td>
+                          <td className="px-2 py-2 text-center" style={{ borderTop: '1px solid rgba(180,190,200,.12)', color: 'var(--gold2)' }}>${Number(emp.salary_amount || 0).toFixed(0)}</td>
+                          <td className="px-2 py-2 text-center" style={{ borderTop: '1px solid rgba(180,190,200,.12)' }}><span className={`pill ${pillCls}`}>{statusLabel}</span></td>
+                          <td className="px-2 py-2 text-center" dir="ltr" style={{ borderTop: '1px solid rgba(180,190,200,.12)', color: '#dce1e4' }}>{sess ? fmtTime(new Date(sess.startMs).toISOString()) : fmtTime(day?.check_in_at || null)}</td>
+                          <td className="px-2 py-2 text-center" dir="ltr" style={{ borderTop: '1px solid rgba(180,190,200,.12)', color: '#dce1e4' }}>{sess?.endMs ? fmtTime(new Date(sess.endMs).toISOString()) : fmtTime(day?.check_out_at || null)}</td>
+                          <td className="px-2 py-2 text-center font-bold" dir="ltr" style={{ borderTop: '1px solid rgba(180,190,200,.12)', color: sess?.running ? '#55d39d' : '#dce1e4' }}>{elapsed || (day?.worked_minutes != null ? `${Math.floor(day.worked_minutes / 60)}:${String(day.worked_minutes % 60).padStart(2, '0')}` : '—')}</td>
+                          <td className="px-2 py-2" style={{ borderTop: '1px solid rgba(180,190,200,.12)' }}>
+                            <div className="flex justify-center gap-1 flex-wrap">
+                              <button type="button" disabled={!!busyId || !!sess?.running || !!(day?.check_in_at && day?.check_out_at)} onClick={() => startSession(emp.id)} className="px-1.5 py-1 rounded text-[10px] font-bold" style={{ border: '1px solid #16a36b', background: '#121a20', color: '#55d39d', opacity: sess?.running || (day?.check_in_at && day?.check_out_at) ? 0.4 : 1 }}>حضور</button>
+                              <button type="button" disabled={!!busyId || !sess?.running} onClick={() => stopSession(emp.id)} className="px-1.5 py-1 rounded text-[10px] font-bold" style={{ border: '1px solid #d83e4d', background: '#121a20', color: '#ff7782', opacity: !sess?.running ? 0.4 : 1 }}>انصراف</button>
+                              <button type="button" disabled={!!busyId || !sess || sess.running} onClick={() => saveSession(emp.id)} className="px-1.5 py-1 rounded text-[10px] font-bold" style={{ border: '1px solid var(--line)', background: '#121a20', color: 'var(--gold2)', opacity: !sess || sess.running ? 0.4 : 1 }}>{busyId === emp.id ? '...' : 'حفظ'}</button>
+                              <button type="button" onClick={() => openEdit(emp)} className="px-1.5 py-1 rounded text-[10px]" style={{ border: '1px solid var(--line)', background: '#121a20', color: 'var(--gold2)' }}>✎</button>
+                              <button type="button" onClick={() => setShowQrEmp(emp)} className="px-1.5 py-1 rounded text-[10px]" style={{ border: '1px solid var(--line)', background: '#121a20', color: 'var(--gold2)' }}>QR</button>
+                              <button type="button" onClick={() => generateReport(emp.id)} className="px-1.5 py-1 rounded text-[10px]" style={{ border: '1px solid var(--line)', background: '#121a20', color: 'var(--gold2)' }}>تقرير</button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                    {!filtered.length && <tr><td colSpan={9} className="text-center py-8" style={{ color: 'var(--muted)' }}>لا يوجد موظفون</td></tr>}
                   </tbody>
                 </table>
               </div>
-            </div>
-            <div className="card">
-              <h3 className="m-0 mb-3 text-sm font-extrabold" style={{ color: '#f3e5c7' }}><span className="ml-1.5" style={{ color: 'var(--gold)' }}>▥</span> مقارنة الحضور والغياب</h3>
-              <div className="chart-wrap" style={{ height: 150 }}>
-                {(weekData.length ? weekData : DAY_NAMES.slice(0, 6).map((label) => ({ label, present: 0, absent: 0 }))).map((d) => (
-                  <div key={`c-${d.label}`} className="chart-col">
-                    <i className="bar" style={{ height: `${Math.max(8, (d.present / maxWeek) * 100)}%` }} />
-                    <i className="bar absent" style={{ height: `${Math.max(8, (d.absent / maxWeek) * 100)}%` }} />
-                    <b className="day">{d.label}</b>
-                  </div>
-                ))}
-              </div>
+            )}
+          </section>
+
+          <section id="withdrawals-section" className="card">
+            <h3 className="m-0 mb-3 text-sm font-extrabold" style={{ color: '#f3e5c7' }}><span className="ml-1.5" style={{ color: 'var(--gold)' }}>＄</span> أحدث السحوبات</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-[11px]" style={{ minWidth: 320, borderCollapse: 'collapse' }}>
+                <thead><tr style={{ background: '#151e24' }}>{['الموظف', 'المبلغ', 'العملة', 'الوقت'].map((h) => (<th key={h} className="px-2 py-2 text-center font-bold" style={{ color: '#e5d4ad' }}>{h}</th>))}</tr></thead>
+                <tbody>
+                  {withdrawals.slice(0, 8).map((w) => (
+                    <tr key={w.id}>
+                      <td className="px-2 py-2 text-center" style={{ borderTop: '1px solid rgba(180,190,200,.12)', color: '#dce1e4' }}>{empNameById[w.employee_id] || '—'}</td>
+                      <td className="px-2 py-2 text-center" style={{ borderTop: '1px solid rgba(180,190,200,.12)', color: 'var(--gold2)' }}>{Number(w.amount).toLocaleString()}</td>
+                      <td className="px-2 py-2 text-center" style={{ borderTop: '1px solid rgba(180,190,200,.12)', color: '#dce1e4' }}>{w.currency}</td>
+                      <td className="px-2 py-2 text-center" dir="ltr" style={{ borderTop: '1px solid rgba(180,190,200,.12)', color: '#dce1e4' }}>{fmtTime(w.withdrawn_at)}</td>
+                    </tr>
+                  ))}
+                  {!withdrawals.length && <tr><td colSpan={4} className="text-center py-6" style={{ color: 'var(--muted)' }}>لا توجد سحوبات</td></tr>}
+                </tbody>
+              </table>
             </div>
           </section>
         </section>
@@ -693,6 +613,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
               </div>
               <div><label className="label">واتساب</label><input className="input-field" value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} dir="ltr" placeholder="09xxxxxxxx" style={{ textAlign: 'left' }} /></div>
               <div className="flex gap-2"><button onClick={saveEdit} disabled={editSaving} className="btn-gold flex-1">{editSaving ? '...' : 'حفظ'}</button><button onClick={() => setEditEmp(null)} className="btn-dark">إلغاء</button></div>
+              <button type="button" className="btn-dark w-full" onClick={() => setShowQrEmp(editEmp)}>عرض QR الموظف</button>
               <button onClick={() => requestDelete(editEmp)} className="w-full btn-danger">حذف الموظف</button>
             </div>
           </div>
@@ -728,7 +649,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
                 {employees.filter((e) => e.status === 'active').map((emp) => (
                   <div key={emp.id} className="card flex items-center justify-between gap-2" style={{ padding: 12 }}>
                     <div><p className="text-sm text-white font-medium m-0">{emp.full_name}</p><p className="text-xs m-0" style={{ color: 'var(--muted)' }}>#{emp.employee_number}{emp.phone ? ` · ${emp.phone}` : ''}</p></div>
-                    <div className="flex gap-1.5"><button onClick={() => openEdit(emp)} className="text-xs px-2.5 py-1.5 rounded-lg btn-dark">تعديل</button><button onClick={() => requestDelete(emp)} className="text-xs px-2.5 py-1.5 rounded-lg btn-danger">حذف</button></div>
+                    <div className="flex gap-1.5"><button onClick={() => openEdit(emp)} className="text-xs px-2.5 py-1.5 rounded-lg btn-dark">تعديل</button><button onClick={() => setShowQrEmp(emp)} className="text-xs px-2.5 py-1.5 rounded-lg btn-dark">QR</button><button onClick={() => requestDelete(emp)} className="text-xs px-2.5 py-1.5 rounded-lg btn-danger">حذف</button></div>
                   </div>
                 ))}
               </div>
@@ -753,8 +674,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
                     const emp = employees.find((x) => x.id === wForm.employee_id)
                     const sent = sendWithdrawalWhatsApp(emp?.phone, wForm.amount, wForm.currency)
                     showToast(true, sent ? 'تم السحب وفُتح واتساب' : 'تم السحب — أضف رقم واتساب للموظف')
-                    setWForm({ employee_id: '', amount: '', currency: 'USD', note: '' })
-                    load()
+                    setWForm({ employee_id: '', amount: '', currency: 'USD', note: '' }); load()
                   }
                   setPanelBusy(false)
                 }}>تسجيل سحب</button>
@@ -770,11 +690,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
                     const res = await fetch('/api/admin/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'update_rates', rate_syp_per_usd: rateSyp, rate_try_per_usd: rateTry }) })
                     const d = await res.json()
                     if (!res.ok) showToast(false, d.error || 'فشل الحفظ')
-                    else {
-                      if (d.rate_syp_per_usd) setRateSyp(String(d.rate_syp_per_usd))
-                      if (d.rate_try_per_usd) setRateTry(String(d.rate_try_per_usd))
-                      showToast(true, 'تم حفظ أسعار الصرف')
-                    }
+                    else { if (d.rate_syp_per_usd) setRateSyp(String(d.rate_syp_per_usd)); if (d.rate_try_per_usd) setRateTry(String(d.rate_try_per_usd)); showToast(true, 'تم حفظ أسعار الصرف') }
                   } catch { showToast(false, 'خطأ اتصال') }
                   setPanelBusy(false)
                 }}>{panelBusy ? '...' : 'حفظ'}</button>
@@ -796,24 +712,34 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
         </div>
       )}
 
+      {showQrScan && (
+        <QrScanner busy={qrBusy} onClose={() => setShowQrScan(false)} onScan={handleQrScan} />
+      )}
+
+      {showQrEmp && (
+        <div className="modal-backdrop" style={{ zIndex: 86 }} onClick={() => setShowQrEmp(null)}>
+          <div className="modal-panel" style={{ maxWidth: 360 }} onClick={(e) => e.stopPropagation()}>
+            <h3 className="m-0 mb-3 font-black text-center" style={{ color: 'var(--gold2)' }}>QR — {showQrEmp.full_name}</h3>
+            <EmployeeQrCard employeeId={showQrEmp.id} name={showQrEmp.full_name} size={200} />
+            <p className="text-xs text-center mt-3 mb-3" style={{ color: 'var(--muted)' }}>
+              هذا الرمز ثابت ومربوط بملف الموظف. يمكن حفظ الصورة أو عرضها من الجوال عند التسجيل.
+            </p>
+            <button type="button" className="btn-dark w-full" onClick={() => setShowQrEmp(null)}>إغلاق</button>
+          </div>
+        </div>
+      )}
+
       {deleteTarget && (
         <div className="modal-backdrop" style={{ zIndex: 90 }} onClick={() => !deleting && setDeleteTarget(null)}>
           <div className="modal-panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 380 }}>
             <h3 className="m-0 mb-2 font-black text-center" style={{ color: 'var(--gold2)' }}>تأكيد الحذف</h3>
             <p className="text-sm text-center m-0 mb-5" style={{ color: '#c8d0d6', lineHeight: 1.7 }}>
-              هل تريد حذف الموظف
-              <br />
-              <strong style={{ color: '#fff' }}>«{deleteTarget.full_name}»</strong>
-              <br />
+              هل تريد حذف الموظف<br /><strong style={{ color: '#fff' }}>«{deleteTarget.full_name}»</strong><br />
               <span style={{ color: 'var(--muted)', fontSize: 12 }}>لا يمكن التراجع عن هذا الإجراء</span>
             </p>
             <div className="flex gap-2">
-              <button type="button" disabled={deleting} onClick={confirmDelete} className="btn-danger flex-1">
-                {deleting ? '...' : 'حذف'}
-              </button>
-              <button type="button" disabled={deleting} onClick={() => setDeleteTarget(null)} className="btn-dark flex-1">
-                إلغاء
-              </button>
+              <button type="button" disabled={deleting} onClick={confirmDelete} className="btn-danger flex-1">{deleting ? '...' : 'حذف'}</button>
+              <button type="button" disabled={deleting} onClick={() => setDeleteTarget(null)} className="btn-dark flex-1">إلغاء</button>
             </div>
           </div>
         </div>
