@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { adminDb, requireTenant } from '@/lib/tenant'
-import { requireSuperAdmin } from '@/lib/superAdmin'
+import { ensurePlatformAdminUserId, requireSuperAdmin } from '@/lib/superAdmin'
 
 export async function GET() {
   const ctx = await requireTenant(['owner', 'manager'])
@@ -68,7 +68,6 @@ export async function POST(req: NextRequest) {
       .eq('id', ctx.tenantId)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-    // إذا سوبر أدمن — حدّث اسم صفحة الدخول أيضاً
     const superAdmin = await requireSuperAdmin()
     if (superAdmin) {
       await db.from('system_settings').upsert(
@@ -129,6 +128,11 @@ export async function POST(req: NextRequest) {
     const email = String(body.email || '').trim().toLowerCase()
     if (!email.includes('@')) {
       return NextResponse.json({ error: 'بريد غير صالح' }, { status: 400 })
+    }
+    // ثبّت صلاحية السوبر أدمن على المعرف قبل تغيير الإيميل
+    const wasSuper = await requireSuperAdmin()
+    if (wasSuper) {
+      await ensurePlatformAdminUserId(ctx.userId, ctx.tenantId)
     }
     const { error } = await db.auth.admin.updateUserById(ctx.userId, { email })
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })

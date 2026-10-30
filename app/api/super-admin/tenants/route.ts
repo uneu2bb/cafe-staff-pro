@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { adminDb } from '@/lib/tenant'
-import { requireSuperAdmin } from '@/lib/superAdmin'
+import { ensurePlatformAdminUserId, requireSuperAdmin } from '@/lib/superAdmin'
 
 function superEmails(): string[] {
   const raw = process.env.SUPER_ADMIN_EMAILS || process.env.SUPER_ADMIN_EMAIL || ''
@@ -15,6 +15,9 @@ export async function GET() {
   const admin = await requireSuperAdmin()
   if (!admin) return NextResponse.json({ error: 'غير مصرح — سوبر أدمن فقط' }, { status: 403 })
 
+  // ثبّت المعرف
+  await ensurePlatformAdminUserId(admin.userId)
+
   const db = adminDb()
   const { data: tenants, error } = await db
     .from('tenants')
@@ -22,6 +25,15 @@ export async function GET() {
     .order('created_at', { ascending: false })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  const { data: adminRows } = await db
+    .from('system_settings')
+    .select('value')
+    .eq('key', 'platform_admin_user_ids')
+  const adminIds = new Set<string>()
+  for (const row of adminRows || []) {
+    for (const p of String(row.value || '').split(',')) if (p.trim()) adminIds.add(p.trim())
+  }
 
   const enriched = []
   for (const t of tenants || []) {
@@ -45,14 +57,18 @@ export async function GET() {
       ownerName = prof?.full_name || ''
     }
 
+    const isProtected =
+      t.owner_user_id === admin.userId ||
+      (t.owner_user_id && adminIds.has(t.owner_user_id)) ||
+      superEmails().includes(ownerEmail.toLowerCase())
+
     enriched.push({
       ...t,
       employee_count: count || 0,
       owner_email: ownerEmail,
       owner_name: ownerName,
-      is_protected:
-        t.owner_user_id === admin.userId ||
-        superEmails().includes(ownerEmail.toLowerCase()),
+      is_protected: !!isProtected,
+      is_platform_admin: !!(t.owner_user_id && adminIds.has(t.owner_user_id)),
     })
   }
 
@@ -65,7 +81,15 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json()
   const { action, tenant_id } = body as {
-    action: 'suspend' | 'activate' | 'delete' | 'set_email' | 'set_password' | 'set_cafe_name'
+    action:
+      | 'suspend'
+      | 'activate'
+      | 'delete'
+      | 'set_email'
+      | 'set_password'
+      | 'set_cafe_name'
+      | 'make_platform_admin'
+      | 'remove_platform_admin'
     tenant_id: string
     email?: string
     password?: string
@@ -88,7 +112,6 @@ export async function POST(req: NextRequest) {
   if (!tenant) return NextResponse.json({ error: 'المقهى غير موجود' }, { status: 404 })
 
   if (action === 'suspend') {
-    // منع إيقاف حساب السوبر أدمن نفسه
     if (tenant.owner_user_id === admin.userId) {
       return NextResponse.json({ error: 'لا يمكن إيقاف حسابك الأساسي' }, { status: 400 })
     }
@@ -125,6 +148,8 @@ export async function POST(req: NextRequest) {
     if (!email.includes('@') || email.length < 5) {
       return NextResponse.json({ error: 'بريد غير صالح' }, { status: 400 })
     }
+    // إذا كان سوبر أدمن — ثبّت المعرف قبل تغيير الإيميل
+    await ensurePlatformAdminUserId(tenant.owner_user_id, tenant_id)
     const { error } = await db.auth.admin.updateUserById(tenant.owner_user_id, { email })
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
     return NextResponse.json({ success: true, message: `تم تغيير بريد «${tenant.name}»` })
@@ -143,8 +168,40 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, message: `تم تغيير كلمة سر «${tenant.name}»` })
   }
 
+  if (action === 'make_platform_admin') {
+    if (!tenant.owner_user_id) {
+      return NextResponse.json({ error: 'لا يوجد مالك' }, { status: 400 })
+    }
+    await ensurePlatformAdminUserId(tenant.owner_user_id, tenant_id)
+    return NextResponse.json({ success: true, message: `تم تعيين «${tenant.name}» كسوبر أدمن` })
+  }
+
+  if (action === 'remove_platform_admin') {
+    if (!tenant.owner_user_id) {
+      return NextResponse.json({ error: 'لا يوجد مالك' }, { status: 400 })
+    }
+    if (tenant.owner_user_id === admin.userId) {
+      return NextResponse.json({ error: 'لا يمكنك إزالة صلاحية أدمن من حسابك' }, { status: 400 })
+    }
+    const { data: rows } = await db
+      .from('system_settings')
+      .select('id, tenant_id, value')
+      .eq('key', 'platform_admin_user_ids')
+    for (const row of rows || []) {
+      const parts = String(row.value || '')
+        .split(',')
+        .map((x) => x.trim())
+        .filter((x) => x && x !== tenant.owner_user_id)
+      await db
+        .from('system_settings')
+        .update({ value: parts.join(',') })
+        .eq('tenant_id', row.tenant_id)
+        .eq('key', 'platform_admin_user_ids')
+    }
+    return NextResponse.json({ success: true, message: `تمت إزالة صلاحية الأدمن من «${tenant.name}»` })
+  }
+
   if (action === 'delete') {
-    // حماية الحساب الأساسي / السوبر أدمن
     if (tenant.owner_user_id === admin.userId) {
       return NextResponse.json({ error: 'لا يمكن حذف حسابك الأساسي' }, { status: 400 })
     }
@@ -158,7 +215,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'لا يمكن حذف حساب السوبر أدمن' }, { status: 400 })
     }
 
-    // إلزامي: تأكيد بكلمة سر حسابك أنت
     const confirmPassword = String(body.confirm_password || '')
     if (!confirmPassword) {
       return NextResponse.json(
