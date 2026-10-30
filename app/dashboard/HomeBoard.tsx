@@ -89,6 +89,15 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
   const [form, setForm] = useState({ full_name: '', employee_number: '', salary_amount: '', work_hours_per_day: '8', job_title: '', notes: '', pin_code: '0000' })
   const [saving, setSaving] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem('csp_sidebar_open')
+      if (v === '0') setSidebarOpen(false)
+      if (v === '1') setSidebarOpen(true)
+    } catch {}
+  }, [])
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([])
   const [weekData, setWeekData] = useState<WeekDay[]>([])
   const [activeNav, setActiveNav] = useState('home')
@@ -364,8 +373,18 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
       )}
       {mobileOpen && <div className="fixed inset-0 z-[15] md:hidden" style={{ background: 'rgba(0,0,0,.58)' }} onClick={() => setMobileOpen(false)} />}
 
-      <aside className={`csp-sidebar fixed top-0 h-screen z-20 flex flex-col${mobileOpen ? ' open' : ''}`} style={{ width: 264, padding: '24px 16px', background: 'linear-gradient(180deg,#0d1115,#080b0e 78%)', borderLeft: '1px solid var(--line)' }}>
-        <style>{`aside.csp-sidebar{right:0}@media(max-width:768px){aside.csp-sidebar{right:-285px;width:270px;transition:right .25s ease;box-shadow:-15px 0 40px rgba(0,0,0,.5)}aside.csp-sidebar.open{right:0}.csp-main-wrap{margin-right:0!important}}`}</style>
+      <aside className={`csp-sidebar fixed top-0 h-screen z-20 flex flex-col${mobileOpen ? ' open' : ''}${!sidebarOpen ? ' collapsed' : ''}`} style={{ width: 264, padding: '24px 16px', background: 'linear-gradient(180deg,#0d1115,#080b0e 78%)', borderLeft: '1px solid var(--line)' }}>
+        <style>{`
+          aside.csp-sidebar{right:0;transition:transform .28s ease,box-shadow .28s ease;will-change:transform}
+          .csp-main-wrap{transition:margin-right .28s ease}
+          aside.csp-sidebar.collapsed{transform:translateX(110%)}
+          .csp-main-wrap.full{margin-right:0!important}
+          @media(max-width:768px){
+            aside.csp-sidebar{right:-285px;width:270px;transform:none;box-shadow:-15px 0 40px rgba(0,0,0,.5)}
+            aside.csp-sidebar.open{right:0}
+            .csp-main-wrap{margin-right:0!important}
+          }
+        `}</style>
         <button type="button" onClick={onLogoClick} className="flex items-center gap-3 px-2.5 pb-6 mb-1 w-full text-right" style={{ background: 'none', border: 'none', borderBottom: '1px solid rgba(214,163,75,.18)' }}>
           <div>
             <h1 className="text-[19px] font-black m-0 leading-tight" style={{ color: 'var(--gold2)' }}>{siteTitle}</h1>
@@ -391,7 +410,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
         </div>
       </aside>
 
-      <div className="csp-main-wrap min-h-screen" style={{ marginRight: 264 }}>
+      <div className={`csp-main-wrap min-h-screen${!sidebarOpen ? ' full' : ''}`} style={{ marginRight: sidebarOpen ? 264 : 0 }}>
         <header className="sticky top-0 z-10 flex items-center justify-between px-4 md:px-8" style={{ height: 64, borderBottom: '1px solid var(--line)', background: 'rgba(8,12,15,.88)', backdropFilter: 'blur(14px)' }}>
           <div className="flex items-center gap-3">
             <div className="w-[38px] h-[38px] rounded-full grid place-items-center text-lg" style={{ background: 'linear-gradient(135deg,#5d4930,#17191b)', border: '1px solid var(--gold)' }}>♙</div>
@@ -400,7 +419,35 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
           <div className="flex items-center gap-3 text-xs" style={{ color: '#d5d8da' }}>
             <span className="hidden sm:inline">{todayLabel()} · {clock}</span>
             <button type="button" className="w-[38px] h-[38px] rounded-[11px] grid place-items-center" style={{ border: '1px solid var(--line)', background: '#11181d', color: 'var(--gold2)' }} onClick={() => showToast(true, 'لا توجد إشعارات جديدة')}>♧</button>
-            <button type="button" className="w-[38px] h-[38px] rounded-[11px] grid place-items-center md:hidden" style={{ border: '1px solid var(--line)', background: '#11181d', color: 'var(--gold2)' }} onClick={() => setMobileOpen(!mobileOpen)}>☰</button>
+            <button
+              type="button"
+              onClick={() => {
+                if (typeof window !== 'undefined' && window.innerWidth <= 768) {
+                  setMobileOpen((v) => !v)
+                } else {
+                  setSidebarOpen((prev) => {
+                    const next = !prev
+                    try { localStorage.setItem('csp_sidebar_open', next ? '1' : '0') } catch {}
+                    return next
+                  })
+                }
+              }}
+              title={sidebarOpen || mobileOpen ? 'إخفاء القائمة' : 'إظهار القائمة'}
+              className="grid place-items-center"
+              style={{
+                width: 42,
+                height: 42,
+                borderRadius: 12,
+                border: '1px solid rgba(214,163,75,0.55)',
+                background: 'linear-gradient(145deg, rgba(214,163,75,0.18), rgba(16,22,28,0.95))',
+                color: 'var(--gold2)',
+                boxShadow: '0 0 18px rgba(214,163,75,0.18)',
+                fontSize: 18,
+                fontWeight: 800,
+              }}
+            >
+              {sidebarOpen || mobileOpen ? '⟫' : '⟪'}
+            </button>
           </div>
         </header>
 
