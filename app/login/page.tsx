@@ -44,21 +44,31 @@ export default function LoginPage() {
   return (
     <div
       className="min-h-screen flex items-center justify-center p-4"
-      style={{ background: 'linear-gradient(135deg, #0a0a0a 0%, #1a1510 50%, #0a0a0a 100%)' }}
+      style={{
+        background:
+          'radial-gradient(ellipse at top right, rgba(14,165,233,0.15), transparent 45%), radial-gradient(ellipse at bottom left, rgba(99,102,241,0.12), transparent 40%), #0b1220',
+      }}
     >
-      <div className="w-full max-w-md">
+      <div className="w-full max-w-md fade-up">
         <div className="text-center mb-8">
           <div
             className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4"
-            style={{ background: 'linear-gradient(135deg, #b45309, #d97706)' }}
+            style={{
+              background: 'linear-gradient(135deg, #0ea5e9, #6366f1)',
+              boxShadow: '0 12px 32px rgba(14,165,233,0.35)',
+            }}
           >
             <span style={{ fontSize: 28 }}>☕</span>
           </div>
-          <h1 className="text-2xl font-bold text-white">{brandName}</h1>
-          <p className="text-zinc-400 text-sm mt-1">نظام إدارة الحضور والانصراف</p>
+          <h1 className="text-2xl font-bold text-white tracking-tight">{brandName}</h1>
+          <p className="text-slate-400 text-sm mt-1">نظام إدارة الحضور والانصراف</p>
         </div>
 
-        <form onSubmit={handleLogin} className="card space-y-5">
+        <form
+          onSubmit={handleLogin}
+          className="card space-y-5"
+          style={{ borderColor: 'rgba(56,189,248,0.15)' }}
+        >
           <div>
             <label className="label">البريد الإلكتروني</label>
             <input
@@ -90,7 +100,7 @@ export default function LoginPage() {
             <div
               className="rounded-xl px-4 py-3 text-sm"
               style={{
-                background: 'rgba(220,38,38,0.15)',
+                background: 'rgba(220,38,38,0.12)',
                 border: '1px solid rgba(220,38,38,0.3)',
                 color: '#fca5a5',
               }}
