@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 import { adminDb } from '@/lib/tenant'
 import { requireSuperAdmin } from '@/lib/superAdmin'
+
+function superEmails(): string[] {
+  const raw = process.env.SUPER_ADMIN_EMAILS || process.env.SUPER_ADMIN_EMAIL || ''
+  return raw
+    .split(',')
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean)
+}
 
 export async function GET() {
   const admin = await requireSuperAdmin()
@@ -41,6 +50,9 @@ export async function GET() {
       employee_count: count || 0,
       owner_email: ownerEmail,
       owner_name: ownerName,
+      is_protected:
+        t.owner_user_id === admin.userId ||
+        superEmails().includes(ownerEmail.toLowerCase()),
     })
   }
 
@@ -58,6 +70,7 @@ export async function POST(req: NextRequest) {
     email?: string
     password?: string
     cafe_name?: string
+    confirm_password?: string
   }
 
   if (!tenant_id || !action) {
@@ -75,6 +88,10 @@ export async function POST(req: NextRequest) {
   if (!tenant) return NextResponse.json({ error: 'المقهى غير موجود' }, { status: 404 })
 
   if (action === 'suspend') {
+    // منع إيقاف حساب السوبر أدمن نفسه
+    if (tenant.owner_user_id === admin.userId) {
+      return NextResponse.json({ error: 'لا يمكن إيقاف حسابك الأساسي' }, { status: 400 })
+    }
     await db.from('tenants').update({ status: 'suspended', updated_at: new Date().toISOString() }).eq('id', tenant_id)
     return NextResponse.json({ success: true, message: `تم إيقاف «${tenant.name}»` })
   }
@@ -127,6 +144,42 @@ export async function POST(req: NextRequest) {
   }
 
   if (action === 'delete') {
+    // حماية الحساب الأساسي / السوبر أدمن
+    if (tenant.owner_user_id === admin.userId) {
+      return NextResponse.json({ error: 'لا يمكن حذف حسابك الأساسي' }, { status: 400 })
+    }
+
+    let ownerEmail = ''
+    if (tenant.owner_user_id) {
+      const { data: userData } = await db.auth.admin.getUserById(tenant.owner_user_id)
+      ownerEmail = (userData?.user?.email || '').toLowerCase()
+    }
+    if (ownerEmail && superEmails().includes(ownerEmail)) {
+      return NextResponse.json({ error: 'لا يمكن حذف حساب السوبر أدمن' }, { status: 400 })
+    }
+
+    // إلزامي: تأكيد بكلمة سر حسابك أنت
+    const confirmPassword = String(body.confirm_password || '')
+    if (!confirmPassword) {
+      return NextResponse.json(
+        { error: 'أدخل كلمة سر حسابك للتأكيد قبل الحذف' },
+        { status: 400 }
+      )
+    }
+
+    const verifier = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    )
+    const { error: authErr } = await verifier.auth.signInWithPassword({
+      email: admin.email,
+      password: confirmPassword,
+    })
+    if (authErr) {
+      return NextResponse.json({ error: 'كلمة السر غير صحيحة — لم يتم الحذف' }, { status: 403 })
+    }
+
     await db.from('employee_withdrawals').delete().eq('tenant_id', tenant_id)
     await db.from('attendance_records').delete().eq('tenant_id', tenant_id)
     await db.from('daily_attendance').delete().eq('tenant_id', tenant_id)

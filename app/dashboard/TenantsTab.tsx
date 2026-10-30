@@ -10,6 +10,7 @@ type TenantRow = {
   owner_name: string
   employee_count: number
   created_at: string
+  is_protected?: boolean
 }
 
 export default function TenantsTab({ onToast }: { onToast: (ok: boolean, msg: string) => void }) {
@@ -30,6 +31,9 @@ export default function TenantsTab({ onToast }: { onToast: (ok: boolean, msg: st
     password: '',
   })
   const [createBusy, setCreateBusy] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<TenantRow | null>(null)
+  const [deletePassword, setDeletePassword] = useState('')
+  const [deleteBusy, setDeleteBusy] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -53,10 +57,7 @@ export default function TenantsTab({ onToast }: { onToast: (ok: boolean, msg: st
     load()
   }, [load])
 
-  const act = async (tenant_id: string, action: 'suspend' | 'activate' | 'delete', name: string) => {
-    if (action === 'delete') {
-      if (!confirm(`حذف نهائي لـ «${name}»؟ سيتم مسح كل بياناته.`)) return
-    }
+  const act = async (tenant_id: string, action: 'suspend' | 'activate', name: string) => {
     setBusyId(tenant_id)
     try {
       const res = await fetch('/api/super-admin/tenants', {
@@ -74,6 +75,37 @@ export default function TenantsTab({ onToast }: { onToast: (ok: boolean, msg: st
       onToast(false, 'خطأ اتصال')
     }
     setBusyId(null)
+  }
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return
+    if (!deletePassword) {
+      onToast(false, 'أدخل كلمة سر حسابك للتأكيد')
+      return
+    }
+    setDeleteBusy(true)
+    try {
+      const res = await fetch('/api/super-admin/tenants', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tenant_id: deleteTarget.id,
+          action: 'delete',
+          confirm_password: deletePassword,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) onToast(false, data.error || 'فشل')
+      else {
+        onToast(true, data.message || 'تم الحذف')
+        setDeleteTarget(null)
+        setDeletePassword('')
+        await load()
+      }
+    } catch {
+      onToast(false, 'خطأ اتصال')
+    }
+    setDeleteBusy(false)
   }
 
   const openEdit = (t: TenantRow) => {
@@ -205,19 +237,22 @@ export default function TenantsTab({ onToast }: { onToast: (ok: boolean, msg: st
             const active = t.status === 'active'
             return (
               <div key={t.id} className="card" style={{ padding: 12 }}>
-                <div className="flex items-start justify-between gap-2 mb-2">
-                  <div className="text-right flex-1">
-                    <p className="text-sm text-white font-medium">{t.name}</p>
-                    <p className="text-xs text-zinc-500">
-                      {t.owner_name || '—'} · {t.owner_email || 'بدون إيميل'}
-                    </p>
-                    <p className="text-xs text-zinc-600">
-                      موظفين: {t.employee_count} ·{' '}
-                      <span style={{ color: active ? '#6ee7b7' : '#fcd34d' }}>
-                        {active ? 'نشط' : 'موقوف'}
-                      </span>
-                    </p>
-                  </div>
+                <div className="text-right flex-1 mb-2">
+                  <p className="text-sm text-white font-medium">
+                    {t.name}
+                    {t.is_protected ? (
+                      <span className="text-[10px] text-amber-400 mr-2">محمي</span>
+                    ) : null}
+                  </p>
+                  <p className="text-xs text-zinc-500">
+                    {t.owner_name || '—'} · {t.owner_email || 'بدون إيميل'}
+                  </p>
+                  <p className="text-xs text-zinc-600">
+                    موظفين: {t.employee_count} ·{' '}
+                    <span style={{ color: active ? '#6ee7b7' : '#fcd34d' }}>
+                      {active ? 'نشط' : 'موقوف'}
+                    </span>
+                  </p>
                 </div>
                 <div className="flex gap-1.5 flex-wrap">
                   <button
@@ -232,45 +267,51 @@ export default function TenantsTab({ onToast }: { onToast: (ok: boolean, msg: st
                   >
                     تعديل الحساب
                   </button>
-                  {active ? (
+                  {!t.is_protected &&
+                    (active ? (
+                      <button
+                        disabled={busyId === t.id}
+                        onClick={() => act(t.id, 'suspend', t.name)}
+                        className="text-xs px-2.5 py-1.5 rounded-lg"
+                        style={{
+                          background: 'rgba(245,158,11,0.15)',
+                          color: '#fcd34d',
+                          border: '1px solid rgba(245,158,11,0.35)',
+                        }}
+                      >
+                        إيقاف
+                      </button>
+                    ) : (
+                      <button
+                        disabled={busyId === t.id}
+                        onClick={() => act(t.id, 'activate', t.name)}
+                        className="text-xs px-2.5 py-1.5 rounded-lg"
+                        style={{
+                          background: 'rgba(16,185,129,0.15)',
+                          color: '#6ee7b7',
+                          border: '1px solid rgba(16,185,129,0.35)',
+                        }}
+                      >
+                        تشغيل
+                      </button>
+                    ))}
+                  {!t.is_protected && (
                     <button
                       disabled={busyId === t.id}
-                      onClick={() => act(t.id, 'suspend', t.name)}
+                      onClick={() => {
+                        setDeleteTarget(t)
+                        setDeletePassword('')
+                      }}
                       className="text-xs px-2.5 py-1.5 rounded-lg"
                       style={{
-                        background: 'rgba(245,158,11,0.15)',
-                        color: '#fcd34d',
-                        border: '1px solid rgba(245,158,11,0.35)',
+                        background: 'rgba(220,38,38,0.15)',
+                        color: '#fca5a5',
+                        border: '1px solid rgba(220,38,38,0.35)',
                       }}
                     >
-                      إيقاف
-                    </button>
-                  ) : (
-                    <button
-                      disabled={busyId === t.id}
-                      onClick={() => act(t.id, 'activate', t.name)}
-                      className="text-xs px-2.5 py-1.5 rounded-lg"
-                      style={{
-                        background: 'rgba(16,185,129,0.15)',
-                        color: '#6ee7b7',
-                        border: '1px solid rgba(16,185,129,0.35)',
-                      }}
-                    >
-                      تشغيل
+                      حذف
                     </button>
                   )}
-                  <button
-                    disabled={busyId === t.id}
-                    onClick={() => act(t.id, 'delete', t.name)}
-                    className="text-xs px-2.5 py-1.5 rounded-lg"
-                    style={{
-                      background: 'rgba(220,38,38,0.15)',
-                      color: '#fca5a5',
-                      border: '1px solid rgba(220,38,38,0.35)',
-                    }}
-                  >
-                    حذف
-                  </button>
                 </div>
               </div>
             )
@@ -338,6 +379,44 @@ export default function TenantsTab({ onToast }: { onToast: (ok: boolean, msg: st
         </div>
       )}
 
+      {deleteTarget && (
+        <div
+          className="fixed inset-0 z-[80] flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.75)' }}
+          onClick={() => setDeleteTarget(null)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl p-4 space-y-3"
+            style={{ background: '#18181b', border: '1px solid #7f1d1d' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-red-300 font-bold text-base">تأكيد الحذف النهائي</h3>
+            <p className="text-sm text-zinc-400">
+              سيتم حذف «{deleteTarget.name}» وكل بياناته. أدخل <b className="text-white">كلمة سر حسابك أنت</b> للتأكيد.
+            </p>
+            <input
+              type="password"
+              className="input-field"
+              value={deletePassword}
+              onChange={(e) => setDeletePassword(e.target.value)}
+              placeholder="كلمة سر حسابك"
+              dir="ltr"
+            />
+            <button
+              disabled={deleteBusy || !deletePassword}
+              onClick={confirmDelete}
+              className="w-full py-2.5 rounded-xl text-sm font-bold text-white"
+              style={{ background: '#dc2626' }}
+            >
+              {deleteBusy ? '...' : 'حذف نهائي'}
+            </button>
+            <button onClick={() => setDeleteTarget(null)} className="btn-secondary w-full">
+              إلغاء
+            </button>
+          </div>
+        </div>
+      )}
+
       {editTarget && (
         <div
           className="fixed inset-0 z-[80] flex items-center justify-center p-4"
@@ -350,8 +429,6 @@ export default function TenantsTab({ onToast }: { onToast: (ok: boolean, msg: st
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-white font-bold text-base">تعديل حساب — {editTarget.name}</h3>
-            <p className="text-xs text-zinc-500">{editTarget.owner_name || 'المالك'}</p>
-
             <div>
               <label className="label">اسم المقهى / الموقع</label>
               <input
@@ -364,7 +441,6 @@ export default function TenantsTab({ onToast }: { onToast: (ok: boolean, msg: st
                 حفظ الاسم
               </button>
             </div>
-
             <div>
               <label className="label">البريد</label>
               <input
@@ -378,7 +454,6 @@ export default function TenantsTab({ onToast }: { onToast: (ok: boolean, msg: st
                 حفظ البريد
               </button>
             </div>
-
             <div>
               <label className="label">كلمة مرور جديدة</label>
               <input
@@ -396,7 +471,6 @@ export default function TenantsTab({ onToast }: { onToast: (ok: boolean, msg: st
                 حفظ كلمة السر
               </button>
             </div>
-
             <button onClick={() => setEditTarget(null)} className="btn-secondary w-full">
               إغلاق
             </button>
