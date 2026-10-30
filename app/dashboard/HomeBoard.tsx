@@ -156,7 +156,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
       const { data: days } = await supabase.from('daily_attendance').select('employee_id, status, check_in_at, check_out_at, worked_minutes, work_date').eq('work_date', today)
       const map: Record<string, DayInfo> = {}
       for (const d of days || []) {
-        let status = d.status || 'none'
+        let status inter = d.status || 'none'
         if (d.check_in_at && d.check_out_at) status = 'checked_out'
         else if (d.check_in_at) status = 'present'
         map[d.employee_id] = { status, check_in_at: d.check_in_at, check_out_at: d.check_out_at, worked_minutes: d.worked_minutes }
@@ -173,7 +173,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
         byDate[d.toISOString().slice(0, 10)] = { present: 0, absent: 0 }
       }
       for (const r of weekRows || []) {
-        if (!byDate[r.work_date]) byDate[r.work_date] = { present: 0, absent: 0 }
+        if (!byDate[r.work_date])) byDate[r.work_date] = { present: 0, absent: 0 }
         if (r.status === 'absent') byDate[r.work_date].absent++
         else if (r.check_in_at) byDate[r.work_date].present++
       }
@@ -647,7 +647,20 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
               <div className="space-y-3">
                 <div><label className="label">SYP لكل 1 USD</label><input className="input-field" type="number" value={rateSyp} onChange={(e) => setRateSyp(e.target.value)} dir="ltr" /></div>
                 <div><label className="label">TRY لكل 1 USD</label><input className="input-field" type="number" value={rateTry} onChange={(e) => setRateTry(e.target.value)} dir="ltr" /></div>
-                <button className="btn-gold w-full" onClick={async () => { const res = await fetch('/api/admin/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'update_rates', rate_syp_per_usd: rateSyp, rate_try_per_usd: rateTry }) }); showToast(res.ok, res.ok ? 'تم' : 'فشل') }}>حفظ</button>
+                <button className="btn-gold w-full" disabled={panelBusy} onClick={async () => {
+                  setPanelBusy(true)
+                  try {
+                    const res = await fetch('/api/admin/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'update_rates', rate_syp_per_usd: rateSyp, rate_try_per_usd: rateTry }) })
+                    const d = await res.json()
+                    if (!res.ok) showToast(false, d.error || 'فشل الحفظ')
+                    else {
+                      if (d.rate_syp_per_usd) setRateSyp(String(d.rate_syp_per_usd))
+                      if (d.rate_try_per_usd) setRateTry(String(d.rate_try_per_usd))
+                      showToast(true, 'تم حفظ أسعار الصرف')
+                    }
+                  } catch { showToast(false, 'خطأ اتصال') }
+                  setPanelBusy(false)
+                }}>{panelBusy ? '...' : 'حفظ'}</button>
               </div>
             )}
             {panelTab === 'account' && (
