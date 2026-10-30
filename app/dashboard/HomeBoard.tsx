@@ -369,14 +369,17 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
         body: JSON.stringify({ employee_id: employeeId, action: 'qr_toggle', method: 'qr' }),
       })
       const data = await res.json()
-      if (!res.ok || data.success === false) showToast(false, data.error || 'فشل المسح')
-      else {
+      if (!res.ok || data.success === false) {
+        showToast(false, data.error || 'فشل المسح')
+        if (data.already_done) setShowQrScan(false)
+      } else {
         showToast(true, data.message || 'تم')
         if (data.action === 'check_in') {
           setTodayMap((prev) => ({ ...prev, [employeeId]: { status: 'present', check_in_at: data.check_in_at, check_out_at: null, worked_minutes: null } }))
         } else if (data.action === 'check_out') {
           setTodayMap((prev) => ({ ...prev, [employeeId]: { status: 'checked_out', check_in_at: data.check_in_at, check_out_at: data.check_out_at, worked_minutes: data.worked_minutes } }))
         }
+        setShowQrScan(false)
         load()
       }
     } catch { showToast(false, 'خطأ اتصال') }
@@ -422,22 +425,6 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
   }
 
   const roleLabel = adminRole === 'owner' ? 'المالك' : adminRole === 'manager' ? 'مدير' : adminRole
-  const maxWeek = Math.max(1, ...weekData.map((d) => Math.max(d.present, d.absent)), 1)
-
-  const activities = useMemo(() => {
-    const items: { time: string; text: string; type: string }[] = []
-    for (const e of employees.filter((x) => x.status === 'active')) {
-      const day = todayMap[e.id]
-      const sess = sessions[e.id]
-      if (sess?.running) items.push({ time: fmtTime(new Date(sess.startMs).toISOString()), text: `حضور جارٍ — ${e.full_name}`, type: 'حضور' })
-      else if (day?.check_out_at) items.push({ time: fmtTime(day.check_out_at), text: `انصراف ${e.full_name}`, type: 'انصراف' })
-      else if (day?.check_in_at) items.push({ time: fmtTime(day.check_in_at), text: `حضور ${e.full_name}`, type: 'حضور' })
-    }
-    for (const w of withdrawals.slice(0, 5)) {
-      items.push({ time: fmtTime(w.withdrawn_at), text: `سحب ${empNameById[w.employee_id] || 'موظف'} — ${w.amount} ${currencyLabel(w.currency)}`, type: 'سحب' })
-    }
-    return items.slice(0, 8)
-  }, [employees, todayMap, sessions, withdrawals, empNameById])
 
   const navGo = (id: string) => {
     setActiveNav(id); setMobileOpen(false)
@@ -457,7 +444,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
       {mobileOpen && <div className="fixed inset-0 z-[15] md:hidden" style={{ background: 'rgba(0,0,0,.58)' }} onClick={() => setMobileOpen(false)} />}
 
       <aside className={`csp-sidebar fixed top-0 h-screen z-20 flex flex-col${mobileOpen ? ' open' : ''}${!sidebarOpen ? ' collapsed' : ''}`} style={{ width: 264, padding: '24px 16px', background: 'linear-gradient(180deg,#0d1115,#080b0e 78%)', borderLeft: '1px solid var(--line)' }}>
-        <style>{`aside.csp-sidebar{right:0;transition:transform .28s ease,box-shadow .28s ease;will-change:transform}.csp-main-wrap{transition:margin-right .28s ease}aside.csp-sidebar.collapsed{transform:translateX(110%)}.csp-main-wrap.full{margin-right:0!important}@media(max-width:768px){aside.csp-sidebar{right:-285px;width:270px;transform:none;box-shadow:-15px 0 40px rgba(0,0,0,.5)}aside.csp-sidebar.open{right:0}.csp-main-wrap{margin-right:0!important}}`}</style>
+        <style>{`aside.csp-sidebar{right:0;transition:transform .28s ease,box-shadow .28s ease}.csp-main-wrap{transition:margin-right .28s ease}aside.csp-sidebar.collapsed{transform:translateX(110%)}.csp-main-wrap.full{margin-right:0!important}@media(max-width:768px){aside.csp-sidebar{right:-285px;width:270px;transform:none;box-shadow:-15px 0 40px rgba(0,0,0,.5)}aside.csp-sidebar.open{right:0}.csp-main-wrap{margin-right:0!important}}`}</style>
         <button type="button" onClick={onLogoClick} className="flex items-center gap-3 px-2.5 pb-6 mb-1 w-full text-right" style={{ background: 'none', border: 'none', borderBottom: '1px solid rgba(214,163,75,.18)' }}>
           <div>
             <h1 className="text-[19px] font-black m-0 leading-tight" style={{ color: 'var(--gold2)' }}>{siteTitle}</h1>
@@ -471,7 +458,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
             </button>
           ))}
         </nav>
-        <div className="mt-auto pt-4 text-xs leading-relaxed" style={{ borderTop: '1px solid rgba(214,163,75,.18)', color: '#b9a06e' }}>
+        <div className="mt-auto pt-4 text-xs" style={{ borderTop: '1px solid rgba(214,163,75,.18)', color: '#b9a06e' }}>
           <div className="flex items-center gap-3 mb-3">
             <div className="w-9 h-9 rounded-full grid place-items-center font-bold" style={{ background: 'linear-gradient(135deg,#5d4930,#17191b)', border: '1px solid var(--gold)', color: 'var(--gold2)' }}>{(adminName || 'م').charAt(0)}</div>
             <div className="text-right min-w-0">
@@ -721,9 +708,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
           <div className="modal-panel" style={{ maxWidth: 360 }} onClick={(e) => e.stopPropagation()}>
             <h3 className="m-0 mb-3 font-black text-center" style={{ color: 'var(--gold2)' }}>QR — {showQrEmp.full_name}</h3>
             <EmployeeQrCard employeeId={showQrEmp.id} name={showQrEmp.full_name} size={200} />
-            <p className="text-xs text-center mt-3 mb-3" style={{ color: 'var(--muted)' }}>
-              هذا الرمز ثابت ومربوط بملف الموظف. يمكن حفظ الصورة أو عرضها من الجوال عند التسجيل.
-            </p>
+            <p className="text-xs text-center mt-3 mb-3" style={{ color: 'var(--muted)' }}>هذا الرمز ثابت ومربوط بملف الموظف.</p>
             <button type="button" className="btn-dark w-full" onClick={() => setShowQrEmp(null)}>إغلاق</button>
           </div>
         </div>
@@ -734,8 +719,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
           <div className="modal-panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 380 }}>
             <h3 className="m-0 mb-2 font-black text-center" style={{ color: 'var(--gold2)' }}>تأكيد الحذف</h3>
             <p className="text-sm text-center m-0 mb-5" style={{ color: '#c8d0d6', lineHeight: 1.7 }}>
-              هل تريد حذف الموظف<br /><strong style={{ color: '#fff' }}>«{deleteTarget.full_name}»</strong><br />
-              <span style={{ color: 'var(--muted)', fontSize: 12 }}>لا يمكن التراجع عن هذا الإجراء</span>
+              هل تريد حذف الموظف<br /><strong style={{ color: '#fff' }}>«{deleteTarget.full_name}»</strong>
             </p>
             <div className="flex gap-2">
               <button type="button" disabled={deleting} onClick={confirmDelete} className="btn-danger flex-1">{deleting ? '...' : 'حذف'}</button>
