@@ -39,7 +39,6 @@ export async function requireSuperAdmin(): Promise<
     return { userId: user.id, email }
   }
 
-  // 2) دور super_admin في profiles
   const db = adminDb()
   const { data: profile } = await db
     .from('profiles')
@@ -47,15 +46,14 @@ export async function requireSuperAdmin(): Promise<
     .eq('id', user.id)
     .maybeSingle()
 
+  // 2) دور super_admin في profiles
   if (profile?.role === 'super_admin') {
     return { userId: user.id, email }
   }
 
-  // 3) إذا ما في قائمة إيميلات بعد — أول owner يعتبر سوبر (مؤقت للتطوير)
-  if (!allowed.length) {
-    if (profile?.role === 'owner') {
-      return { userId: user.id, email }
-    }
+  // 3) أول owner إذا ما في قائمة إيميلات
+  if (!allowed.length && profile?.role === 'owner') {
+    return { userId: user.id, email }
   }
 
   return null
