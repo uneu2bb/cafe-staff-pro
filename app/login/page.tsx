@@ -45,29 +45,33 @@ export default function LoginPage() {
     <div
       className="min-h-screen flex items-center justify-center p-4"
       style={{
-        background:
-          'radial-gradient(ellipse at top right, rgba(14,165,233,0.15), transparent 45%), radial-gradient(ellipse at bottom left, rgba(99,102,241,0.12), transparent 40%), #0b1220',
+        background: 'linear-gradient(135deg, rgba(5,11,20,0.98), rgba(15,32,39,0.95))',
       }}
     >
-      <div className="w-full max-w-md fade-up">
-        <div className="text-center mb-8">
-          <div
-            className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4"
-            style={{
-              background: 'linear-gradient(135deg, #0ea5e9, #6366f1)',
-              boxShadow: '0 12px 32px rgba(14,165,233,0.35)',
-            }}
-          >
-            <span style={{ fontSize: 28 }}>☕</span>
-          </div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">{brandName}</h1>
-          <p className="text-slate-400 text-sm mt-1">نظام إدارة الحضور والانصراف</p>
+      <div className="w-full max-w-md fade-up text-center">
+        <div
+          className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-5 glow-pulse"
+          style={{
+            background: 'rgba(0,255,204,0.12)',
+            border: '2px solid #00ffcc',
+          }}
+        >
+          <span style={{ fontSize: 28 }}>☕</span>
         </div>
+
+        <h1 className="neon-title text-3xl md:text-4xl mb-2">{brandName}</h1>
+        <p className="neon-subtitle mb-8">نظام إدارة الحضور والانصراف</p>
 
         <form
           onSubmit={handleLogin}
-          className="card space-y-5"
-          style={{ borderColor: 'rgba(56,189,248,0.15)' }}
+          className="space-y-5 text-right"
+          style={{
+            background: 'rgba(15, 30, 50, 0.95)',
+            border: '2px solid #00ffcc',
+            borderRadius: 15,
+            padding: 28,
+            boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
+          }}
         >
           <div>
             <label className="label">البريد الإلكتروني</label>
@@ -76,7 +80,6 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="input-field"
-              placeholder=""
               required
               dir="ltr"
               style={{ textAlign: 'left' }}
@@ -89,7 +92,6 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="input-field"
-              placeholder=""
               required
               dir="ltr"
               style={{ textAlign: 'left' }}
@@ -98,18 +100,18 @@ export default function LoginPage() {
 
           {error && (
             <div
-              className="rounded-xl px-4 py-3 text-sm"
+              className="rounded-xl px-4 py-3 text-sm text-center"
               style={{
-                background: 'rgba(220,38,38,0.12)',
-                border: '1px solid rgba(220,38,38,0.3)',
-                color: '#fca5a5',
+                background: 'rgba(255,51,51,0.12)',
+                border: '1px solid rgba(255,51,51,0.45)',
+                color: '#ff6b6b',
               }}
             >
               {error}
             </div>
           )}
 
-          <button type="submit" disabled={loading} className="btn-primary w-full py-3 text-base">
+          <button type="submit" disabled={loading} className="btn-primary w-full py-3.5 text-base">
             {loading ? 'جاري الدخول...' : 'تسجيل الدخول'}
           </button>
         </form>
