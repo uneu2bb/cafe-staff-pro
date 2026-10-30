@@ -14,6 +14,7 @@ type Employee = {
   work_hours_per_day: number
   status: string
   job_title: string | null
+  phone: string | null
   pin_code: string | null
   hire_date: string | null
   notes: string | null
@@ -49,6 +50,28 @@ function currencyLabel(c: string) {
   return '$'
 }
 
+function normalizeWhatsApp(phone: string | null | undefined) {
+  if (!phone) return ''
+  let p = String(phone).replace(/\D/g, '')
+  if (!p) return ''
+  if (p.startsWith('00')) p = p.slice(2)
+  if (p.startsWith('0')) p = '963' + p.slice(1)
+  return p
+}
+
+function sendWithdrawalWhatsApp(phone: string | null | undefined, amount: number | string, currency: string) {
+  const n = normalizeWhatsApp(phone)
+  if (!n) return false
+  const now = new Date()
+  const day = now.toLocaleDateString('ar-SY', { weekday: 'long' })
+  const date = now.toLocaleDateString('ar-SY', { year: 'numeric', month: 'long', day: 'numeric' })
+  const time = now.toLocaleTimeString('ar-SY', { hour: 'numeric', minute: '2-digit', hour12: true })
+  const msg = `تم تسجيل سحب بمبلغ ${amount} ${currency}\nاليوم: ${day}\nالتاريخ: ${date}\nالساعة: ${time}`
+  const url = `https://wa.me/${n}?text=${encodeURIComponent(msg)}`
+  try { window.open(url, '_blank') } catch {}
+  return true
+}
+
 export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp = 'Cafe Staff Pro' }: { adminName: string; adminRole: string; cafeName?: string }) {
   const router = useRouter()
   const [employees, setEmployees] = useState<Employee[]>([])
@@ -69,7 +92,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
     return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}`
   })
   const [editEmp, setEditEmp] = useState<Employee | null>(null)
-  const [editForm, setEditForm] = useState({ full_name: '', salary_amount: '', work_hours_per_day: '8', job_title: '', pin_code: '', notes: '' })
+  const [editForm, setEditForm] = useState({ full_name: '', salary_amount: '', work_hours_per_day: '8', job_title: '', phone: '', pin_code: '', notes: '' })
   const [editSaving, setEditSaving] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<Employee | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -88,7 +111,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
   const [rateSyp, setRateSyp] = useState('15000')
   const [rateTry, setRateTry] = useState('34')
   const [wForm, setWForm] = useState({ employee_id: '', amount: '', currency: 'USD', note: '' })
-  const [form, setForm] = useState({ full_name: '', employee_number: '', salary_amount: '', work_hours_per_day: '8', job_title: '', notes: '', pin_code: '0000' })
+  const [form, setForm] = useState({ full_name: '', employee_number: '', salary_amount: '', work_hours_per_day: '8', job_title: '', phone: '', notes: '', pin_code: '0000' })
   const [saving, setSaving] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
@@ -268,13 +291,13 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
   }
   const openEdit = (emp: Employee) => {
     setEditEmp(emp)
-    setEditForm({ full_name: emp.full_name, salary_amount: String(emp.salary_amount || 0), work_hours_per_day: String(emp.work_hours_per_day || 8), job_title: emp.job_title || '', pin_code: emp.pin_code || '', notes: emp.notes || '' })
+    setEditForm({ full_name: emp.full_name, salary_amount: String(emp.salary_amount || 0), work_hours_per_day: String(emp.work_hours_per_day || 8), job_title: emp.job_title || '', phone: emp.phone || '', pin_code: emp.pin_code || '', notes: emp.notes || '' })
   }
   const saveEdit = async () => {
     if (!editEmp) return
     setEditSaving(true)
     try {
-      const res = await fetch(`/api/employees/${editEmp.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ full_name: editForm.full_name, salary_amount: Number(editForm.salary_amount) || 0, work_hours_per_day: Number(editForm.work_hours_per_day) || 8, job_title: editForm.job_title || null, pin_code: editForm.pin_code || null, notes: editForm.notes || null }) })
+      const res = await fetch(`/api/employees/${editEmp.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ full_name: editForm.full_name, salary_amount: Number(editForm.salary_amount) || 0, work_hours_per_day: Number(editForm.work_hours_per_day) || 8, job_title: editForm.job_title || null, phone: editForm.phone || null, pin_code: editForm.pin_code || null, notes: editForm.notes || null }) })
       const data = await res.json()
       if (!res.ok) showToast(false, data.error || 'فشل')
       else { showToast(true, 'تم'); setEditEmp(null); load() }
@@ -299,11 +322,29 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
     } catch { showToast(false, 'خطأ') }
     setDeleting(false)
   }
+
+  const openControlPanel = async () => {
+    let unlocked = false
+    try { unlocked = localStorage.getItem('csp_panel_unlocked') === '1' } catch {}
+    if (unlocked) {
+      setPanelOpen(true)
+      setShowPanelGate(false)
+      try {
+        const s = await fetch('/api/admin/settings').then((r) => r.json())
+        setNewEmail(s.email || ''); setCafeName(s.cafe_name || ''); setRateSyp(s.rate_syp_per_usd || '15000'); setRateTry(s.rate_try_per_usd || '34')
+        try { const sa = await fetch('/api/super-admin/tenants'); setIsSuperAdmin(sa.ok) } catch { setIsSuperAdmin(false) }
+      } catch {}
+      return
+    }
+    setShowPanelGate(true)
+    setPanelPwd('')
+  }
+
   const onLogoClick = () => {
     const now = Date.now()
     if (now - logoClicks.current.t > 2000) logoClicks.current = { n: 0, t: now }
     logoClicks.current.n += 1; logoClicks.current.t = now
-    if (logoClicks.current.n >= 5) { logoClicks.current.n = 0; setShowPanelGate(true); setPanelPwd('') }
+    if (logoClicks.current.n >= 5) { logoClicks.current.n = 0; openControlPanel() }
   }
   const verifyPanel = async () => {
     setPanelBusy(true)
@@ -312,6 +353,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
       const data = await res.json()
       if (!res.ok) showToast(false, data.error || 'فشل')
       else {
+        try { localStorage.setItem('csp_panel_unlocked', '1') } catch {}
         setShowPanelGate(false); setPanelOpen(true)
         const s = await fetch('/api/admin/settings').then((r) => r.json())
         setNewEmail(s.email || ''); setCafeName(s.cafe_name || ''); setRateSyp(s.rate_syp_per_usd || '15000'); setRateTry(s.rate_try_per_usd || '34')
@@ -354,7 +396,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
       const res = await fetch('/api/employees', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, salary_amount: Number(form.salary_amount) || 0, work_hours_per_day: Number(form.work_hours_per_day) || 8 }) })
       const data = await res.json()
       if (!res.ok) showToast(false, data.error || 'فشل')
-      else { showToast(true, 'تم'); setShowAdd(false); setForm({ full_name: '', employee_number: '', salary_amount: '', work_hours_per_day: '8', job_title: '', notes: '', pin_code: '0000' }); load() }
+      else { showToast(true, 'تم'); setShowAdd(false); setForm({ full_name: '', employee_number: '', salary_amount: '', work_hours_per_day: '8', job_title: '', phone: '', notes: '', pin_code: '0000' }); load() }
     } catch { showToast(false, 'خطأ') }
     setSaving(false)
   }
@@ -380,7 +422,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
   const navGo = (id: string) => {
     setActiveNav(id); setMobileOpen(false)
     if (id === 'add') setShowAdd(true)
-    if (id === 'panel') { setShowPanelGate(true); setPanelPwd('') }
+    if (id === 'panel') { openControlPanel() }
     if (id === 'home') window.scrollTo({ top: 0, behavior: 'smooth' })
     if (id === 'employees') document.getElementById('employees-section')?.scrollIntoView({ behavior: 'smooth' })
     if (id === 'withdrawals') document.getElementById('withdrawals-section')?.scrollIntoView({ behavior: 'smooth' })
@@ -426,7 +468,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
               <p className="text-[11px] m-0" style={{ color: 'var(--muted)' }}>{roleLabel}</p>
             </div>
           </div>
-          <button type="button" className="side-nav-item" style={{ color: '#ff7782' }} onClick={async () => { await createClient().auth.signOut(); router.push('/login') }}>خروج من الحساب</button>
+          <button type="button" className="side-nav-item" style={{ color: '#ff7782' }} onClick={async () => { try { localStorage.removeItem('csp_panel_unlocked') } catch {}; await createClient().auth.signOut(); router.push('/login') }}>خروج من الحساب</button>
         </div>
       </aside>
 
@@ -632,6 +674,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
                 <div><label className="label">الرقم *</label><input className="input-field" required value={form.employee_number} onChange={(e) => setForm({ ...form, employee_number: e.target.value })} dir="ltr" /></div>
                 <div><label className="label">الراتب $</label><input className="input-field" type="number" value={form.salary_amount} onChange={(e) => setForm({ ...form, salary_amount: e.target.value })} dir="ltr" /></div>
               </div>
+              <div><label className="label">واتساب</label><input className="input-field" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} dir="ltr" placeholder="09xxxxxxxx" style={{ textAlign: 'left' }} /></div>
               <div className="flex gap-2"><button type="submit" disabled={saving} className="btn-gold flex-1">{saving ? '...' : 'حفظ'}</button><button type="button" onClick={() => setShowAdd(false)} className="btn-dark">إلغاء</button></div>
             </form>
           </div>
@@ -648,6 +691,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
                 <div><label className="label">الراتب $</label><input className="input-field" type="number" value={editForm.salary_amount} onChange={(e) => setEditForm({ ...editForm, salary_amount: e.target.value })} dir="ltr" /></div>
                 <div><label className="label">ساعات/يوم</label><input className="input-field" type="number" value={editForm.work_hours_per_day} onChange={(e) => setEditForm({ ...editForm, work_hours_per_day: e.target.value })} dir="ltr" /></div>
               </div>
+              <div><label className="label">واتساب</label><input className="input-field" value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} dir="ltr" placeholder="09xxxxxxxx" style={{ textAlign: 'left' }} /></div>
               <div className="flex gap-2"><button onClick={saveEdit} disabled={editSaving} className="btn-gold flex-1">{editSaving ? '...' : 'حفظ'}</button><button onClick={() => setEditEmp(null)} className="btn-dark">إلغاء</button></div>
               <button onClick={() => requestDelete(editEmp)} className="w-full btn-danger">حذف الموظف</button>
             </div>
@@ -683,7 +727,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
               <div className="space-y-2 max-h-80 overflow-y-auto">
                 {employees.filter((e) => e.status === 'active').map((emp) => (
                   <div key={emp.id} className="card flex items-center justify-between gap-2" style={{ padding: 12 }}>
-                    <div><p className="text-sm text-white font-medium m-0">{emp.full_name}</p><p className="text-xs m-0" style={{ color: 'var(--muted)' }}>#{emp.employee_number}</p></div>
+                    <div><p className="text-sm text-white font-medium m-0">{emp.full_name}</p><p className="text-xs m-0" style={{ color: 'var(--muted)' }}>#{emp.employee_number}{emp.phone ? ` · ${emp.phone}` : ''}</p></div>
                     <div className="flex gap-1.5"><button onClick={() => openEdit(emp)} className="text-xs px-2.5 py-1.5 rounded-lg btn-dark">تعديل</button><button onClick={() => requestDelete(emp)} className="text-xs px-2.5 py-1.5 rounded-lg btn-danger">حذف</button></div>
                   </div>
                 ))}
@@ -694,7 +738,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
               <div className="space-y-3">
                 <select className="input-field" value={wForm.employee_id} onChange={(e) => setWForm({ ...wForm, employee_id: e.target.value })} style={{ textAlign: 'right' }}>
                   <option value="">اختر موظف</option>
-                  {employees.filter((e) => e.status === 'active').map((e) => <option key={e.id} value={e.id}>{e.full_name}</option>)}
+                  {employees.filter((e) => e.status === 'active').map((e) => <option key={e.id} value={e.id}>{e.full_name}{e.phone ? ` (${e.phone})` : ''}</option>)}
                 </select>
                 <div className="grid grid-cols-2 gap-2">
                   <input className="input-field" type="number" placeholder="المبلغ" value={wForm.amount} onChange={(e) => setWForm({ ...wForm, amount: e.target.value })} dir="ltr" />
@@ -705,7 +749,13 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
                   const res = await fetch('/api/withdrawals', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(wForm) })
                   const d = await res.json()
                   if (!res.ok) showToast(false, d.error || 'فشل')
-                  else { showToast(true, 'تم'); setWForm({ employee_id: '', amount: '', currency: 'USD', note: '' }); load() }
+                  else {
+                    const emp = employees.find((x) => x.id === wForm.employee_id)
+                    const sent = sendWithdrawalWhatsApp(emp?.phone, wForm.amount, wForm.currency)
+                    showToast(true, sent ? 'تم السحب وفُتح واتساب' : 'تم السحب — أضف رقم واتساب للموظف')
+                    setWForm({ employee_id: '', amount: '', currency: 'USD', note: '' })
+                    load()
+                  }
                   setPanelBusy(false)
                 }}>تسجيل سحب</button>
               </div>
@@ -740,7 +790,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
             )}
             <div className="mt-4 space-y-2">
               <button onClick={() => setPanelOpen(false)} className="btn-dark w-full">إغلاق اللوحة</button>
-              <button onClick={async () => { setPanelOpen(false); await createClient().auth.signOut(); router.push('/login') }} className="w-full btn-danger">خروج من الحساب</button>
+              <button onClick={async () => { setPanelOpen(false); try { localStorage.removeItem('csp_panel_unlocked') } catch {}; await createClient().auth.signOut(); router.push('/login') }} className="w-full btn-danger">خروج من الحساب</button>
             </div>
           </div>
         </div>
