@@ -367,7 +367,6 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
       <aside className={`csp-sidebar fixed top-0 h-screen z-20 flex flex-col${mobileOpen ? ' open' : ''}`} style={{ width: 264, padding: '24px 16px', background: 'linear-gradient(180deg,#0d1115,#080b0e 78%)', borderLeft: '1px solid var(--line)' }}>
         <style>{`aside.csp-sidebar{right:0}@media(max-width:768px){aside.csp-sidebar{right:-285px;width:270px;transition:right .25s ease;box-shadow:-15px 0 40px rgba(0,0,0,.5)}aside.csp-sidebar.open{right:0}.csp-main-wrap{margin-right:0!important}}`}</style>
         <button type="button" onClick={onLogoClick} className="flex items-center gap-3 px-2.5 pb-6 mb-1 w-full text-right" style={{ background: 'none', border: 'none', borderBottom: '1px solid rgba(214,163,75,.18)' }}>
-          <div className="w-[54px] h-[54px] rounded-2xl grid place-items-center text-[29px]" style={{ color: 'var(--gold2)', border: '1px solid var(--line)', background: 'linear-gradient(145deg,#241b0e,#0e1113)' }}>☕</div>
           <div>
             <h1 className="text-[19px] font-black m-0 leading-tight" style={{ color: 'var(--gold2)' }}>{siteTitle}</h1>
             <small className="text-[11px]" style={{ color: '#b8a47d' }}>نظام إدارة الحضور والانصراف</small>
@@ -406,11 +405,6 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
         </header>
 
         <section className="max-w-[1600px] mx-auto px-3 md:px-7 py-5 md:py-6 space-y-4">
-          <div className="rounded-[14px] px-4 py-3.5" style={{ border: '1px solid var(--line)', background: 'linear-gradient(110deg,rgba(214,163,75,.055),rgba(13,19,24,.85))' }}>
-            <h2 className="text-[19px] md:text-[23px] font-black m-0">لوحة التحكم</h2>
-            <p className="text-[11px] md:text-xs m-0 mt-0.5" style={{ color: 'var(--muted)' }}>نظرة عامة على أداء الموظفين وإدارة العمل</p>
-          </div>
-
           <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {[
               { label: 'إجمالي الموظفين', value: stats.total, note: 'موظف مسجل', icon: '♟' },
