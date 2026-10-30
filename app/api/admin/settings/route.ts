@@ -102,26 +102,48 @@ export async function POST(req: NextRequest) {
   }
 
   if (action === 'update_rates') {
-    const syp = String(body.rate_syp_per_usd || '15000')
-    const tryR = String(body.rate_try_per_usd || '34')
-    await db.from('system_settings').upsert(
-      [
-        {
+    const syp = String(body.rate_syp_per_usd ?? '').trim()
+    const tryR = String(body.rate_try_per_usd ?? '').trim()
+    if (!syp || Number.isNaN(Number(syp)) || Number(syp) <= 0) {
+      return NextResponse.json({ error: 'سعر SYP غير صالح' }, { status: 400 })
+    }
+    if (!tryR || Number.isNaN(Number(tryR)) || Number(tryR) <= 0) {
+      return NextResponse.json({ error: 'سعر TRY غير صالح' }, { status: 400 })
+    }
+
+    const rows: { key: string; value: string; description: string }[] = [
+      { key: 'rate_syp_per_usd', value: syp, description: 'كم ليرة سورية مقابل 1 دولار' },
+      { key: 'rate_try_per_usd', value: tryR, description: 'كم ليرة تركية مقابل 1 دولار' },
+    ]
+
+    for (const row of rows) {
+      const { data: existing, error: selErr } = await db
+        .from('system_settings')
+        .select('key')
+        .eq('tenant_id', ctx.tenantId)
+        .eq('key', row.key)
+        .maybeSingle()
+      if (selErr) return NextResponse.json({ error: selErr.message }, { status: 500 })
+
+      if (existing) {
+        const { error } = await db
+          .from('system_settings')
+          .update({ value: row.value, description: row.description })
+          .eq('tenant_id', ctx.tenantId)
+          .eq('key', row.key)
+        if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+      } else {
+        const { error } = await db.from('system_settings').insert({
           tenant_id: ctx.tenantId,
-          key: 'rate_syp_per_usd',
-          value: syp,
-          description: 'كم ليرة سورية مقابل 1 دولار',
-        },
-        {
-          tenant_id: ctx.tenantId,
-          key: 'rate_try_per_usd',
-          value: tryR,
-          description: 'كم ليرة تركية مقابل 1 دولار',
-        },
-      ],
-      { onConflict: 'tenant_id,key' }
-    )
-    return NextResponse.json({ success: true })
+          key: row.key,
+          value: row.value,
+          description: row.description,
+        })
+        if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+      }
+    }
+
+    return NextResponse.json({ success: true, rate_syp_per_usd: syp, rate_try_per_usd: tryR })
   }
 
   if (action === 'update_email') {
@@ -129,7 +151,6 @@ export async function POST(req: NextRequest) {
     if (!email.includes('@')) {
       return NextResponse.json({ error: 'بريد غير صالح' }, { status: 400 })
     }
-    // ثبّت صلاحية السوبر أدمن على المعرف قبل تغيير الإيميل
     const wasSuper = await requireSuperAdmin()
     if (wasSuper) {
       await ensurePlatformAdminUserId(ctx.userId, ctx.tenantId)
