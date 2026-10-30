@@ -44,7 +44,7 @@ function statusMeta(s: string) {
   return map[s] || map.none
 }
 function nowClock() {
-  return new Date().toLocaleTimeString('ar-SY', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
+  return new Date().toLocaleTimeString('ar-SY', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true })
 }
 function todayLabel() {
   return new Date().toLocaleDateString('ar-SY', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
@@ -91,7 +91,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
   const [saving, setSaving] = useState(false)
   const [mobileNav, setMobileNav] = useState(false)
 
-  const showToast = (ok: boolean, msg: string) => { setToast({ ok, msg }); setTimeout(() => setToast(null), 2500) }
+  const showToast = (ok: boolean, msg: string) => { setToast({ ok, msg }); setTimeout(() => setToast(null), 2200) }
 
   useEffect(() => {
     try {
@@ -108,18 +108,32 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
 
   useEffect(() => {
     if (!sessionsReady) return
-    try {
-      if (Object.keys(sessions).length === 0) localStorage.removeItem(SESS_KEY)
-      else localStorage.setItem(SESS_KEY, JSON.stringify({ date: new Date().toISOString().slice(0, 10), sessions }))
-    } catch {}
+    const tmr = setTimeout(() => {
+      try {
+        if (Object.keys(sessions).length === 0) localStorage.removeItem(SESS_KEY)
+        else localStorage.setItem(SESS_KEY, JSON.stringify({ date: new Date().toISOString().slice(0, 10), sessions }))
+      } catch {}
+    }, 200)
+    return () => clearTimeout(tmr)
   }, [sessions, sessionsReady])
 
+  const hasRunningSession = useMemo(
+    () => Object.values(sessions).some((s) => s.running),
+    [sessions]
+  )
+
   useEffect(() => {
-    const id = setInterval(() => {
-      setTick((x) => x + 1)
-      setClock(nowClock())
-    }, 1000)
-    const bump = () => setTick((x) => x + 1)
+    setClock(nowClock())
+    const id = setInterval(() => setClock(nowClock()), 1000)
+    return () => clearInterval(id)
+  }, [])
+
+  useEffect(() => {
+    if (!hasRunningSession) return
+    const id = setInterval(() => setTick((x) => x + 1), 1000)
+    const bump = () => {
+      if (document.visibilityState === 'visible') setTick((x) => x + 1)
+    }
     document.addEventListener('visibilitychange', bump)
     window.addEventListener('focus', bump)
     return () => {
@@ -127,7 +141,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
       document.removeEventListener('visibilitychange', bump)
       window.removeEventListener('focus', bump)
     }
-  }, [])
+  }, [hasRunningSession])
 
   const load = useCallback(async () => {
     try {
@@ -157,7 +171,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
     if (day?.check_in_at && day?.check_out_at) { showToast(false, 'تم حفظ دوام هذا الموظف اليوم'); return }
     if (sessions[empId]?.running) return
     setSessions((prev) => ({ ...prev, [empId]: { startMs: Date.now(), endMs: null, running: true } }))
-    showToast(true, 'بدأت الساعة — تبقى حتى لو أغلقت المتصفح')
+    showToast(true, 'بدأت الساعة')
   }
 
   const stopSession = (empId: string) => {
@@ -307,7 +321,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
         <aside className="hidden md:flex flex-col w-[240px] shrink-0 border-l" style={{ background: 'linear-gradient(180deg,#050b14,#0a1420)', borderColor: 'rgba(0,255,204,0.22)' }}>
           <div className="p-5 border-b" style={{ borderColor: 'rgba(0,255,204,0.15)' }}>
             <button type="button" onClick={onLogoClick} className="flex items-center gap-3 w-full text-right" style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
-              <div className="w-11 h-11 rounded-2xl flex items-center justify-center glow-pulse" style={{ background: 'rgba(0,255,204,0.12)', border: '2px solid #00ffcc', boxShadow: '0 0 18px rgba(0,255,204,0.25)' }}>
+              <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(0,255,204,0.12)', border: '2px solid #00ffcc' }}>
                 <span className="text-lg">☕</span>
               </div>
               <div className="text-right flex-1">
@@ -337,7 +351,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
         </aside>
 
         <div className="flex-1 min-w-0">
-          <header className="sticky top-0 z-20 border-b md:hidden" style={{ background: 'rgba(5,11,20,0.92)', backdropFilter: 'blur(14px)', borderColor: 'rgba(0,255,204,0.18)' }}>
+          <header className="sticky top-0 z-20 border-b md:hidden" style={{ background: 'rgba(5,11,20,0.95)', borderColor: 'rgba(0,255,204,0.18)' }}>
             <div className="px-4 py-3 flex items-center justify-between gap-3">
               <button type="button" onClick={onLogoClick} className="flex items-center gap-2" style={{ background: 'none', border: 'none' }}>
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(0,255,204,0.12)', border: '2px solid #00ffcc' }}><span>☕</span></div>
@@ -360,14 +374,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
           </header>
 
           <main className="p-4 md:p-6 space-y-5 max-w-7xl mx-auto">
-            <section
-              className="relative overflow-hidden rounded-2xl border fade-up"
-              style={{
-                borderColor: 'rgba(0,255,204,0.28)',
-                background:
-                  'linear-gradient(135deg, rgba(5,11,20,0.92), rgba(15,32,39,0.85)), radial-gradient(circle at 20% 30%, rgba(0,255,204,0.12), transparent 50%), radial-gradient(circle at 80% 20%, rgba(0,119,255,0.1), transparent 45%)',
-              }}
-            >
+            <section className="relative overflow-hidden rounded-2xl border fade-up" style={{ borderColor: 'rgba(0,255,204,0.28)', background: 'linear-gradient(135deg, rgba(5,11,20,0.92), rgba(15,32,39,0.85))' }}>
               <div className="relative z-10 p-5 md:p-7 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="text-right">
                   <p className="text-[#00ffcc] text-sm mb-1">مرحباً بك في لوحة التحكم</p>
@@ -376,13 +383,13 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
                 </div>
                 <div className="rounded-2xl px-5 py-3 text-center shrink-0" style={{ background: 'rgba(10,20,35,0.75)', border: '1px solid rgba(0,255,204,0.4)' }}>
                   <p className="text-[11px] text-[#8ab4f8] mb-1">{todayLabel()}</p>
-                  <p className="text-2xl font-bold tracking-wider text-white" dir="ltr" style={{ fontVariantNumeric: 'tabular-nums', color: '#00ffcc' }}>{clock}</p>
+                  <p className="text-2xl font-bold tracking-wider" dir="ltr" style={{ fontVariantNumeric: 'tabular-nums', color: '#00ffcc' }}>{clock}</p>
                   <p className="text-[11px] text-[#00ffcc]/80 mt-1">الوقت الحالي</p>
                 </div>
               </div>
             </section>
 
-            <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 fade-up">
+            <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">
               {[
                 { label: 'إجمالي الموظفين', value: stats.total, icon: '👥' },
                 { label: 'يعملون الآن', value: stats.working, icon: '⏱' },
@@ -395,9 +402,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
                       <p className="text-xs text-[#8ab4f8]">{s.label}</p>
                       <p className="text-2xl font-bold text-white mt-1">{s.value}</p>
                     </div>
-                    <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg" style={{ background: 'rgba(0,255,204,0.1)', border: '1.5px solid rgba(0,255,204,0.5)', color: '#00ffcc' }}>
-                      {s.icon}
-                    </div>
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg" style={{ background: 'rgba(0,255,204,0.1)', border: '1.5px solid rgba(0,255,204,0.5)', color: '#00ffcc' }}>{s.icon}</div>
                   </div>
                 </div>
               ))}
@@ -428,9 +433,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
                     <div key={emp.id} className="card glass employee-card">
                       <div className="flex items-start justify-between gap-2 mb-3">
                         <div className="flex items-center gap-3 flex-1 min-w-0">
-                          <div className="w-11 h-11 rounded-xl shrink-0 flex items-center justify-center font-bold" style={{ background: 'rgba(0,255,204,0.12)', border: '1.5px solid #00ffcc', color: '#00ffcc' }}>
-                            {emp.full_name.charAt(0)}
-                          </div>
+                          <div className="w-11 h-11 rounded-xl shrink-0 flex items-center justify-center font-bold" style={{ background: 'rgba(0,255,204,0.12)', border: '1.5px solid #00ffcc', color: '#00ffcc' }}>{emp.full_name.charAt(0)}</div>
                           <div className="text-right min-w-0">
                             <h3 className="font-bold text-white text-base truncate">{emp.full_name}</h3>
                             <p className="text-xs text-[#5a7a9a]">#{emp.employee_number} · <span className="text-[#ffd666]">${Number(emp.salary_amount || 0).toFixed(0)}</span></p>
@@ -438,7 +441,6 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
                         </div>
                         <span className="text-[11px] px-2.5 py-1 rounded-full shrink-0" style={{ background: st.bg, color: st.color }}>{st.label}</span>
                       </div>
-
                       <div className="mb-3 rounded-xl px-3 py-3 text-center" style={{ background: sess?.running ? 'rgba(0,255,204,0.1)' : sess ? 'rgba(255,214,102,0.1)' : 'rgba(10,20,35,0.75)', border: `1px solid ${sess?.running ? 'rgba(0,255,204,0.4)' : sess ? 'rgba(255,214,102,0.4)' : 'rgba(0,255,204,0.22)'}` }}>
                         <p className="text-[10px] text-[#5a7a9a] mb-0.5">{sess?.running ? 'يعمل الآن' : sess ? 'متوقف — جاهز للحفظ' : day?.worked_minutes ? 'ساعات محفوظة' : 'الساعة'}</p>
                         <p className="text-2xl font-bold tracking-wider" dir="ltr" style={{ color: sess?.running ? '#00ffcc' : sess ? '#ffd666' : '#8ab4f8', fontVariantNumeric: 'tabular-nums' }}>
@@ -452,7 +454,6 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
                           </p>
                         )}
                       </div>
-
                       <div className="grid grid-cols-3 gap-2 mb-2">
                         <button disabled={!!busyId || !!sess?.running || !!(day?.check_in_at && day?.check_out_at)} onClick={() => startSession(emp.id)} className="py-2.5 rounded-xl text-xs font-bold" style={{ background: 'rgba(0,255,204,0.12)', border: '2px solid #00ffcc', color: '#00ffcc', opacity: sess?.running || (day?.check_in_at && day?.check_out_at) ? 0.4 : 1 }}>حضور</button>
                         <button disabled={!!busyId || !sess?.running} onClick={() => stopSession(emp.id)} className="py-2.5 rounded-xl text-xs font-bold" style={{ background: 'rgba(255,51,51,0.12)', border: '2px solid #ff3333', color: '#ff6b6b', opacity: !sess?.running ? 0.4 : 1 }}>انصراف</button>
@@ -588,13 +589,13 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
             {panelTab === 'account' && (
               <div className="space-y-3">
                 <div><label className="label">اسم الكافيه / الموقع</label><input className="input-field" value={cafeName} onChange={(e) => setCafeName(e.target.value)} style={{ textAlign: 'right' }} />
-                  <button className="btn-secondary w-full mt-2 text-sm" onClick={async () => { const res = await fetch('/api/admin/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'update_cafe_name', cafe_name: cafeName }) }); const d = await res.json(); if (res.ok) { setSiteTitle(cafeName.trim() || siteTitle); showToast(true, 'تم تغيير الاسم') } else showToast(false, d.error) }}>حفظ الاسم</button></div>
+                  <button className="btn-secondary w-full mt-2 text-sm" onClick={async () => { const res = await fetch('/api/admin/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'update_cafe_name', cafe_name: cafeName }) }); const d = await res.json(); if (res.ok) { setSiteTitle(cafeName.trim() || siteTitle); showToast(true, 'تم') } else showToast(false, d.error) }}>حفظ الاسم</button></div>
                 <div><label className="label">البريد</label><input className="input-field" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} dir="ltr" style={{ textAlign: 'left' }} />
                   <button className="btn-secondary w-full mt-2 text-sm" onClick={async () => { const res = await fetch('/api/admin/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'update_email', email: newEmail }) }); const d = await res.json(); showToast(res.ok, res.ok ? 'تم' : d.error) }}>حفظ</button></div>
                 <div><label className="label">كلمة مرور اللوحة</label><input type="password" className="input-field" value={newPanelPwd} onChange={(e) => setNewPanelPwd(e.target.value)} dir="ltr" />
                   <button className="btn-secondary w-full mt-2 text-sm" onClick={async () => { const res = await fetch('/api/admin/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'update_panel_password', password: newPanelPwd }) }); const d = await res.json(); showToast(res.ok, res.ok ? 'تم' : d.error) }}>حفظ</button></div>
-                <div><label className="label">كلمة سر الدخول للموقع</label><input type="password" className="input-field" value={newLoginPwd} onChange={(e) => setNewLoginPwd(e.target.value)} dir="ltr" placeholder="6 أحرف على الأقل" />
-                  <button className="btn-secondary w-full mt-2 text-sm" onClick={async () => { const res = await fetch('/api/admin/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'update_password', password: newLoginPwd }) }); const d = await res.json(); if (res.ok) { setNewLoginPwd(''); showToast(true, 'تم تغيير كلمة سر الدخول') } else showToast(false, d.error) }}>حفظ كلمة سر الدخول</button></div>
+                <div><label className="label">كلمة سر الدخول</label><input type="password" className="input-field" value={newLoginPwd} onChange={(e) => setNewLoginPwd(e.target.value)} dir="ltr" />
+                  <button className="btn-secondary w-full mt-2 text-sm" onClick={async () => { const res = await fetch('/api/admin/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'update_password', password: newLoginPwd }) }); const d = await res.json(); if (res.ok) { setNewLoginPwd(''); showToast(true, 'تم') } else showToast(false, d.error) }}>حفظ كلمة السر</button></div>
               </div>
             )}
             <button onClick={() => setPanelOpen(false)} className="btn-secondary w-full mt-4">إغلاق</button>
