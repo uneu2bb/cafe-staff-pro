@@ -74,7 +74,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
   const logoClicks = useRef({ n: 0, t: 0 })
   const [showPanelGate, setShowPanelGate] = useState(false)
   const [panelOpen, setPanelOpen] = useState(false)
-  const [panelPwd, setPanelPwd] = use useState('')
+  const [panelPwd, setPanelPwd] = useState('')
   const [panelTab, setPanelTab] = useState<'account' | 'rates' | 'withdrawals' | 'employees' | 'cafes'>('employees')
   const [panelBusy, setPanelBusy] = useState(false)
   const [isSuperAdmin, setIsSuperAdmin] = useState(false)
@@ -401,7 +401,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
           <div className="flex items-center gap-3 text-xs" style={{ color: '#d5d8da' }}>
             <span className="hidden sm:inline">{todayLabel()} · {clock}</span>
             <button type="button" className="w-[38px] h-[38px] rounded-[11px] grid place-items-center" style={{ border: '1px solid var(--line)', background: '#11181d', color: 'var(--gold2)' }} onClick={() => showToast(true, 'لا توجد إشعارات جديدة')}>♧</button>
-            <button type="button" className="w-[38px] h-[38px] rounded-[11px] grid place-items-center md:hidden" style={{ border: '1px solid var(--line)', background: '#11181d', color: 'var(--gold2)' }} onClick={() => setMobileOpen(!mobileOpen)}>☰</button>
+            <button type="button" className="w-[38px] h-[38px] rounded-[11px] grid place-items-center md:hidden" style={{ border: '1px solid var(--line)', background: '#11181d', color: 'var(--(--gold2)' }} onClick={() => setMobileOpen(!mobileOpen)}>☰</button>
           </div>
         </header>
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
@@ -10,16 +10,6 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [brandName, setBrandName] = useState('Cafe Staff Pro')
-
-  useEffect(() => {
-    fetch('/api/public/brand')
-      .then((r) => r.json())
-      .then((d) => {
-        if (d?.name) setBrandName(d.name)
-      })
-      .catch(() => {})
-  }, [])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -33,8 +23,7 @@ export default function LoginPage() {
         setLoading(false)
         return
       }
-      router.push('/dashboard')
-      router.refresh()
+      router.replace('/dashboard')
     } catch {
       setError('خطأ في الاتصال')
       setLoading(false)
@@ -45,32 +34,32 @@ export default function LoginPage() {
     <div
       className="min-h-screen flex items-center justify-center p-4"
       style={{
-        background: 'linear-gradient(135deg, rgba(5,11,20,0.98), rgba(15,32,39,0.95))',
+        background: 'radial-gradient(ellipse at top, rgba(214,163,75,0.08), transparent 50%), #070a0d',
       }}
     >
-      <div className="w-full max-w-md fade-up text-center">
+      <div className="w-full max-w-sm text-center">
         <div
-          className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-5 glow-pulse"
+          className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-6"
           style={{
-            background: 'rgba(0,255,204,0.12)',
-            border: '2px solid #00ffcc',
+            background: 'rgba(214,163,75,0.1)',
+            border: '1px solid rgba(214,163,75,0.4)',
           }}
         >
-          <span style={{ fontSize: 28 }}>☕</span>
+          <span style={{ fontSize: 26 }}>☕</span>
         </div>
 
-        <h1 className="neon-title text-3xl md:text-4xl mb-2">{brandName}</h1>
-        <p className="neon-subtitle mb-8">نظام إدارة الحضور والانصراف</p>
+        <p className="text-sm mb-6" style={{ color: '#9ca7b0' }}>
+          تسجيل الدخول إلى النظام
+        </p>
 
         <form
           onSubmit={handleLogin}
-          className="space-y-5 text-right"
+          className="space-y-4 text-right"
           style={{
-            background: 'rgba(15, 30, 50, 0.95)',
-            border: '2px solid #00ffcc',
-            borderRadius: 15,
-            padding: 28,
-            boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
+            background: '#101920',
+            border: '1px solid rgba(214,163,75,0.3)',
+            borderRadius: 16,
+            padding: 24,
           }}
         >
           <div>
@@ -81,6 +70,7 @@ export default function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
               className="input-field"
               required
+              autoComplete="email"
               dir="ltr"
               style={{ textAlign: 'left' }}
             />
@@ -93,6 +83,7 @@ export default function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
               className="input-field"
               required
+              autoComplete="current-password"
               dir="ltr"
               style={{ textAlign: 'left' }}
             />
@@ -100,18 +91,18 @@ export default function LoginPage() {
 
           {error && (
             <div
-              className="rounded-xl px-4 py-3 text-sm text-center"
+              className="rounded-xl px-3 py-2.5 text-sm text-center"
               style={{
-                background: 'rgba(255,51,51,0.12)',
-                border: '1px solid rgba(255,51,51,0.45)',
-                color: '#ff6b6b',
+                background: 'rgba(216,62,77,0.12)',
+                border: '1px solid rgba(216,62,77,0.4)',
+                color: '#ff7782',
               }}
             >
               {error}
             </div>
           )}
 
-          <button type="submit" disabled={loading} className="btn-primary w-full py-3.5 text-base">
+          <button type="submit" disabled={loading} className="btn-gold w-full py-3 text-base">
             {loading ? 'جاري الدخول...' : 'تسجيل الدخول'}
           </button>
         </form>
