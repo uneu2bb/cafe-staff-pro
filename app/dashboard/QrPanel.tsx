@@ -11,7 +11,6 @@ export function parseEmployeeQr(raw: string): string | null {
   const s = String(raw || '').trim()
   if (!s) return null
   if (s.startsWith('CSP1:')) return s.slice(5).trim() || null
-  // UUID plain
   if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)) return s
   return null
 }
@@ -53,6 +52,8 @@ export default function QrScanner({
   const regionId = 'csp-qr-reader'
   const scannerRef = useRef<any>(null)
   const lastRef = useRef<{ code: string; at: number }>({ code: '', at: 0 })
+  const onScanRef = useRef(onScan)
+  onScanRef.current = onScan
   const [error, setError] = useState('')
   const [ready, setReady] = useState(false)
 
@@ -73,7 +74,7 @@ export default function QrScanner({
             const now = Date.now()
             if (lastRef.current.code === id && now - lastRef.current.at < 3500) return
             lastRef.current = { code: id, at: now }
-            onScan(id)
+            onScanRef.current(id)
           },
           () => {}
         )
@@ -90,7 +91,7 @@ export default function QrScanner({
         s.stop().then(() => s.clear()).catch(() => {})
       }
     }
-  }, [onScan])
+  }, [])
 
   return (
     <div className="modal-backdrop" style={{ zIndex: 85 }} onClick={onClose}>
