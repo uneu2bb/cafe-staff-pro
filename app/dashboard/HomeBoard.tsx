@@ -156,7 +156,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
       const { data: days } = await supabase.from('daily_attendance').select('employee_id, status, check_in_at, check_out_at, worked_minutes, work_date').eq('work_date', today)
       const map: Record<string, DayInfo> = {}
       for (const d of days || []) {
-        let status inter = d.status || 'none'
+        let status = d.status || 'none'
         if (d.check_in_at && d.check_out_at) status = 'checked_out'
         else if (d.check_in_at) status = 'present'
         map[d.employee_id] = { status, check_in_at: d.check_in_at, check_out_at: d.check_out_at, worked_minutes: d.worked_minutes }
@@ -173,7 +173,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
         byDate[d.toISOString().slice(0, 10)] = { present: 0, absent: 0 }
       }
       for (const r of weekRows || []) {
-        if (!byDate[r.work_date])) byDate[r.work_date] = { present: 0, absent: 0 }
+        if (!byDate[r.work_date]) byDate[r.work_date] = { present: 0, absent: 0 }
         if (r.status === 'absent') byDate[r.work_date].absent++
         else if (r.check_in_at) byDate[r.work_date].present++
       }
