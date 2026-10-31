@@ -1,11 +1,28 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, memo } from 'react'
+import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import ReportModal from './ReportModal'
-import TenantsTab from './TenantsTab'
-import QrScanner, { EmployeeQrCard } from './QrPanel'
+import { EmployeeQrCard } from './QrPanel'
+
+const ReportModal = dynamic(() => import('./ReportModal'), { ssr: false })
+const TenantsTab = dynamic(() => import('./TenantsTab'), { ssr: false })
+const QrScanner = dynamic(() => import('./QrPanel'), { ssr: false })
+
+const LiveClock = memo(function LiveClock() {
+  const [clock, setClock] = useState(() =>
+    new Date().toLocaleTimeString('ar-SY', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true })
+  )
+  useEffect(() => {
+    const id = setInterval(() => {
+      setClock(new Date().toLocaleTimeString('ar-SY', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true }))
+    }, 1000)
+    return () => clearInterval(id)
+  }, [])
+  const label = new Date().toLocaleDateString('ar-SY', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+  return <span className="hidden sm:inline">{label} · {clock}</span>
+})
 
 type Employee = {
   id: string
@@ -37,12 +54,6 @@ function formatElapsed(ms: number) {
   const s = totalSec % 60
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 }
-function nowClock() {
-  return new Date().toLocaleTimeString('ar-SY', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true })
-}
-function todayLabel() {
-  return new Date().toLocaleDateString('ar-SY', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
-}
 
 function normalizeWhatsApp(phone: string | null | undefined) {
   if (!phone) return ''
@@ -72,7 +83,6 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
   const [sessions, setSessions] = useState<Record<string, Session>>({})
   const [sessionsReady, setSessionsReady] = useState(false)
   const [tick, setTick] = useState(0)
-  const [clock, setClock] = useState(nowClock())
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [toast, setToast] = useState<{ ok: boolean; msg: string } | null>(null)
@@ -125,7 +135,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
 
   const showToast = (ok: boolean, msg: string) => {
     setToast({ ok, msg })
-    setTimeout(() => setToast(null), 2500)
+    setTimeout(() => setToast(null), 2200)
   }
 
   const overlayOpen = panelOpen || showPanelGate || !!editEmp || showAdd || !!deleteTarget || mobileOpen || reportLoading || !!fullReport || showQrScan || !!showQrEmp
@@ -164,12 +174,6 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
   const hasRunningSession = useMemo(() => Object.values(sessions).some((s) => s.running), [sessions])
 
   useEffect(() => {
-    setClock(nowClock())
-    const id = setInterval(() => setClock(nowClock()), 1000)
-    return () => clearInterval(id)
-  }, [])
-
-  useEffect(() => {
     if (!hasRunningSession) return
     const id = setInterval(() => setTick((x) => x + 1), 1000)
     const bump = () => { if (document.visibilityState === 'visible') setTick((x) => x + 1) }
@@ -184,26 +188,24 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch('/api/employees')
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'فشل')
-      setEmployees(data.employees || [])
       const supabase = createClient()
       const today = new Date().toISOString().slice(0, 10)
-      const { data: days } = await supabase.from('daily_attendance').select('employee_id, status, check_in_at, check_out_at, worked_minutes, work_date').eq('work_date', today)
+      const [empRes, daysRes, wrRes] = await Promise.all([
+        fetch('/api/employees').then(async (r) => ({ ok: r.ok, data: await r.json() })),
+        supabase.from('daily_attendance').select('employee_id, status, check_in_at, check_out_at, worked_minutes, work_date').eq('work_date', today),
+        fetch('/api/withdrawals').then(async (r) => ({ ok: r.ok, data: await r.json() })).catch(() => ({ ok: false, data: {} })),
+      ])
+      if (!empRes.ok) throw new Error(empRes.data.error || 'فشل')
+      setEmployees(empRes.data.employees || [])
       const map: Record<string, DayInfo> = {}
-      for (const d of days || []) {
+      for (const d of daysRes.data || []) {
         let status = d.status || 'none'
         if (d.check_in_at && d.check_out_at) status = 'checked_out'
         else if (d.check_in_at) status = 'present'
         map[d.employee_id] = { status, check_in_at: d.check_in_at, check_out_at: d.check_out_at, worked_minutes: d.worked_minutes }
       }
       setTodayMap(map)
-      try {
-        const wr = await fetch('/api/withdrawals')
-        const wj = await wr.json()
-        if (wr.ok) setWithdrawals(wj.withdrawals || [])
-      } catch {}
+      if (wrRes.ok) setWithdrawals(wrRes.data.withdrawals || [])
     } catch (e: unknown) {
       showToast(false, e instanceof Error ? e.message : 'خطأ')
     }
@@ -318,6 +320,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
   }
 
   const handleQrScan = useCallback(async (employeeId: string) => {
+    setShowQrScan(false)
     setQrBusy(true)
     try {
       const res = await fetch('/api/attendance/action', {
@@ -328,17 +331,17 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
       const data = await res.json()
       if (!res.ok || data.success === false) {
         showToast(false, data.error || 'فشل المسح')
-        if (data.already_done) setShowQrScan(false)
       } else {
         showToast(true, data.message || 'تم')
-        if (data.action === 'check_in') setTodayMap((prev) => ({ ...prev, [employeeId]: { status: 'present', check_in_at: data.check_in_at, check_out_at: null, worked_minutes: null } }))
-        else if (data.action === 'check_out') setTodayMap((prev) => ({ ...prev, [employeeId]: { status: 'checked_out', check_in_at: data.check_in_at, check_out_at: data.check_out_at, worked_minutes: data.worked_minutes } }))
-        setShowQrScan(false)
-        load()
+        if (data.action === 'check_in') {
+          setTodayMap((prev) => ({ ...prev, [employeeId]: { status: 'present', check_in_at: data.check_in_at, check_out_at: null, worked_minutes: null } }))
+        } else if (data.action === 'check_out') {
+          setTodayMap((prev) => ({ ...prev, [employeeId]: { status: 'checked_out', check_in_at: data.check_in_at, check_out_at: data.check_out_at, worked_minutes: data.worked_minutes } }))
+        }
       }
     } catch { showToast(false, 'خطأ اتصال') }
     setQrBusy(false)
-  }, [load])
+  }, [])
 
   const stats = useMemo(() => {
     const active = employees.filter((e) => e.status === 'active')
@@ -398,7 +401,7 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
       {mobileOpen && <div className="fixed inset-0 z-[15] md:hidden" style={{ background: 'rgba(0,0,0,.58)' }} onClick={() => setMobileOpen(false)} />}
 
       <aside className={`csp-sidebar fixed top-0 h-screen z-20 flex flex-col${mobileOpen ? ' open' : ''}${!sidebarOpen ? ' collapsed' : ''}`} style={{ width: 264, padding: '24px 16px', background: 'linear-gradient(180deg,#0d1115,#080b0e 78%)', borderLeft: '1px solid var(--line)' }}>
-        <style>{`aside.csp-sidebar{right:0;transition:transform .28s ease}.csp-main-wrap{transition:margin-right .28s ease}aside.csp-sidebar.collapsed{transform:translateX(110%)}.csp-main-wrap.full{margin-right:0!important}@media(max-width:768px){aside.csp-sidebar{right:-285px;width:270px;transform:none}aside.csp-sidebar.open{right:0}.csp-main-wrap{margin-right:0!important}}`}</style>
+        <style>{`aside.csp-sidebar{right:0;transition:transform .22s ease}.csp-main-wrap{transition:margin-right .22s ease}aside.csp-sidebar.collapsed{transform:translateX(110%)}.csp-main-wrap.full{margin-right:0!important}@media(max-width:768px){aside.csp-sidebar{right:-285px;width:270px;transform:none}aside.csp-sidebar.open{right:0}.csp-main-wrap{margin-right:0!important}}`}</style>
         <button type="button" onClick={onLogoClick} className="flex items-center gap-3 px-2.5 pb-6 mb-1 w-full text-right" style={{ background: 'none', border: 'none', borderBottom: '1px solid rgba(214,163,75,.18)' }}>
           <div>
             <h1 className="text-[19px] font-black m-0 leading-tight" style={{ color: 'var(--gold2)' }}>{siteTitle}</h1>
@@ -425,13 +428,13 @@ export default function HomeBoard({ adminName, adminRole, cafeName: cafeNameProp
       </aside>
 
       <div className={`csp-main-wrap min-h-screen${!sidebarOpen ? ' full' : ''}`} style={{ marginRight: sidebarOpen ? 264 : 0 }}>
-        <header className="sticky top-0 z-10 flex items-center justify-between px-4 md:px-8" style={{ height: 64, borderBottom: '1px solid var(--line)', background: 'rgba(8,12,15,.88)', backdropFilter: 'blur(14px)' }}>
+        <header className="sticky top-0 z-10 flex items-center justify-between px-4 md:px-8" style={{ height: 64, borderBottom: '1px solid var(--line)', background: 'rgba(8,12,15,.88)', backdropFilter: 'blur(10px)' }}>
           <div className="flex items-center gap-3">
             <div className="w-[38px] h-[38px] rounded-full grid place-items-center text-lg" style={{ background: 'linear-gradient(135deg,#5d4930,#17191b)', border: '1px solid var(--gold)' }}>♙</div>
             <div><strong className="text-[13px] block">{adminName}</strong><small className="text-[11px]" style={{ color: 'var(--muted)' }}>{roleLabel}</small></div>
           </div>
           <div className="flex items-center gap-3 text-xs" style={{ color: '#d5d8da' }}>
-            <span className="hidden sm:inline">{todayLabel()} · {clock}</span>
+            <LiveClock />
             <button type="button" className="w-[38px] h-[38px] rounded-[11px] grid place-items-center" style={{ border: '1px solid var(--line)', background: '#11181d', color: 'var(--gold2)' }} onClick={() => setShowQrScan(true)} title="مسح QR">▣</button>
             <button type="button" className="grid place-items-center" onClick={() => { if (typeof window !== 'undefined' && window.innerWidth <= 768) setMobileOpen((v) => !v); else setSidebarOpen((prev) => { const next = !prev; try { localStorage.setItem('csp_sidebar_open', next ? '1' : '0') } catch {}; return next }) }} style={{ width: 42, height: 42, borderRadius: 12, border: '1px solid rgba(214,163,75,0.55)', background: 'linear-gradient(145deg, rgba(214,163,75,0.18), rgba(16,22,28,0.95))', color: 'var(--gold2)', fontSize: 18, fontWeight: 800 }}>{sidebarOpen || mobileOpen ? '⟫' : '⟪'}</button>
           </div>
