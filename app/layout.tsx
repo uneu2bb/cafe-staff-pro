@@ -1,9 +1,24 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
+import { Cairo } from 'next/font/google'
 import './globals.css'
 
+const cairo = Cairo({
+  subsets: ['arabic', 'latin'],
+  weight: ['400', '500', '600', '700', '800', '900'],
+  display: 'swap',
+  variable: '--font-cairo',
+})
+
 export const metadata: Metadata = {
-  title: 'Cafe Staff Pro',
+  title: 'LMR',
   description: 'نظام إدارة الموظفين والحضور والانصراف',
+}
+
+export const viewport: Viewport = {
+  themeColor: '#080b0e',
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
 }
 
 export default function RootLayout({
@@ -12,17 +27,10 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="ar" dir="rtl">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap"
-          rel="stylesheet"
-        />
-        <meta name="theme-color" content="#080b0e" />
-      </head>
-      <body>{children}</body>
+    <html lang="ar" dir="rtl" className={cairo.variable}>
+      <body className={cairo.className} style={{ margin: 0 }}>
+        {children}
+      </body>
     </html>
   )
 }

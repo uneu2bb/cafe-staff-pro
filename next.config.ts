@@ -5,7 +5,14 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   compress: true,
   experimental: {
-    optimizePackageImports: ['@supabase/supabase-js', '@supabase/ssr'],
+    optimizePackageImports: [
+      '@supabase/supabase-js',
+      '@supabase/ssr',
+      'lucide-react',
+      'date-fns',
+      'recharts',
+      'qrcode.react',
+    ],
   },
 }
 

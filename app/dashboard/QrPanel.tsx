@@ -51,11 +51,14 @@ export default function QrScanner({
 }) {
   const regionId = 'csp-qr-reader'
   const scannerRef = useRef<any>(null)
-  const lastRef = useRef<{ code: string; at: number }>({ code: '', at: 0 })
+  const lockedRef = useRef(false)
   const onScanRef = useRef(onScan)
+  const onCloseRef = useRef(onClose)
   onScanRef.current = onScan
+  onCloseRef.current = onClose
   const [error, setError] = useState('')
   const [ready, setReady] = useState(false)
+  const [captured, setCaptured] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -67,14 +70,23 @@ export default function QrScanner({
         scannerRef.current = scanner
         await scanner.start(
           { facingMode: 'environment' },
-          { fps: 8, qrbox: { width: 240, height: 240 }, aspectRatio: 1 },
-          (decoded) => {
+          { fps: 15, qrbox: { width: 260, height: 260 }, aspectRatio: 1 },
+          async (decoded) => {
+            if (lockedRef.current || cancelled) return
             const id = parseEmployeeQr(decoded)
             if (!id) return
-            const now = Date.now()
-            if (lastRef.current.code === id && now - lastRef.current.at < 3500) return
-            lastRef.current = { code: id, at: now }
-            onScanRef.current(id)
+            lockedRef.current = true
+            setCaptured(true)
+            // أوقف الكاميرا فوراً ثم أغلق النافذة وسجّل
+            try {
+              if (scannerRef.current) {
+                await scannerRef.current.stop()
+                await scannerRef.current.clear()
+              }
+            } catch {}
+            scannerRef.current = null
+            onCloseRef.current()
+            void onScanRef.current(id)
           },
           () => {}
         )
@@ -94,20 +106,20 @@ export default function QrScanner({
   }, [])
 
   return (
-    <div className="modal-backdrop" style={{ zIndex: 85 }} onClick={onClose}>
+    <div className="modal-backdrop" style={{ zIndex: 85 }} onClick={() => !captured && onClose()}>
       <div className="modal-panel" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
         <h3 className="m-0 mb-2 font-black text-center" style={{ color: 'var(--gold2)' }}>
           مسح QR للحضور / الانصراف
         </h3>
         <p className="text-xs text-center m-0 mb-3" style={{ color: 'var(--muted)' }}>
-          وجّه الكاميرا نحو QR الموظف — يُسجَّل حضور أو انصراف تلقائياً
+          {captured ? 'تم الالتقاط — جاري التسجيل...' : 'وجّه الكاميرا نحو QR الموظف'}
         </p>
         <div
           id={regionId}
           className="overflow-hidden rounded-xl"
           style={{ minHeight: 260, background: '#0a0f14', border: '1px solid var(--line)' }}
         />
-        {!ready && !error && (
+        {!ready && !error && !captured && (
           <p className="text-xs text-center mt-2" style={{ color: 'var(--muted)' }}>
             جاري تشغيل الكاميرا...
           </p>
@@ -117,12 +129,12 @@ export default function QrScanner({
             {error}
           </p>
         )}
-        {busy && (
+        {(busy || captured) && (
           <p className="text-xs text-center mt-2 font-bold" style={{ color: 'var(--gold2)' }}>
             جاري التسجيل...
           </p>
         )}
-        <button type="button" className="btn-dark w-full mt-3" onClick={onClose}>
+        <button type="button" className="btn-dark w-full mt-3" onClick={onClose} disabled={captured && !!busy}>
           إغلاق الماسح
         </button>
       </div>
