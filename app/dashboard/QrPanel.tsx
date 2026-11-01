@@ -70,23 +70,25 @@ export default function QrScanner({
         scannerRef.current = scanner
         await scanner.start(
           { facingMode: 'environment' },
-          { fps: 15, qrbox: { width: 260, height: 260 }, aspectRatio: 1 },
-          async (decoded) => {
+          { fps: 20, qrbox: { width: 240, height: 240 }, aspectRatio: 1 },
+          (decoded) => {
             if (lockedRef.current || cancelled) return
             const id = parseEmployeeQr(decoded)
             if (!id) return
             lockedRef.current = true
             setCaptured(true)
-            // أوقف الكاميرا فوراً ثم أغلق النافذة وسجّل
-            try {
-              if (scannerRef.current) {
-                await scannerRef.current.stop()
-                await scannerRef.current.clear()
-              }
-            } catch {}
-            scannerRef.current = null
+
+            // سجّل فوراً وأغلق النافذة بدون انتظار إيقاف الكاميرا
             onCloseRef.current()
             void onScanRef.current(id)
+
+            const s = scannerRef.current
+            scannerRef.current = null
+            if (s) {
+              s.stop()
+                .then(() => s.clear())
+                .catch(() => {})
+            }
           },
           () => {}
         )
@@ -112,7 +114,7 @@ export default function QrScanner({
           مسح QR للحضور / الانصراف
         </h3>
         <p className="text-xs text-center m-0 mb-3" style={{ color: 'var(--muted)' }}>
-          {captured ? 'تم الالتقاط — جاري التسجيل...' : 'وجّه الكاميرا نحو QR الموظف'}
+          {captured ? 'تم — جاري الحفظ...' : 'وجّه الكاميرا نحو QR الموظف'}
         </p>
         <div
           id={regionId}
