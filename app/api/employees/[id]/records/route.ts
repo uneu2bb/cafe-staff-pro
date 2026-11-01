@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { adminDb, requireTenant } from '@/lib/tenant'
 
+function monthBounds(month: string) {
+  const [y, mo] = month.split('-').map(Number)
+  const from = `${month}-01`
+  const lastDay = new Date(y, mo, 0).getDate()
+  const to = `${month}-${String(lastDay).padStart(2, '0')}`
+  return { from, to }
+}
+
 /** DELETE body: { months: string[] } e.g. ["2026-10","2026-09"] */
 export async function DELETE(
   req: NextRequest,
@@ -11,80 +19,76 @@ export async function DELETE(
 
   const { id } = await params
   const body = await req.json().catch(() => ({}))
-  const months: string[] = Array.isArray(body.months) ? body.months.map(String) : []
+  const months: string[] = Array.isArray(body.months)
+    ? [...new Set(body.months.map(String))].filter((m) => /^\d{4}-\d{2}$/.test(m))
+    : []
 
   if (!months.length) {
     return NextResponse.json({ error: 'اختر شهراً واحداً على الأقل' }, { status: 400 })
-  }
-
-  for (const m of months) {
-    if (!/^\d{4}-\d{2}$/.test(m)) {
-      return NextResponse.json({ error: `شهر غير صالح: ${m}` }, { status: 400 })
-    }
   }
 
   const db = adminDb()
 
   const { data: emp } = await db
     .from('profiles')
-    .select('id, full_name, role, tenant_id')
+    .select('id, full_name, role')
     .eq('id', id)
     .eq('tenant_id', ctx.tenantId)
-    .single()
+    .maybeSingle()
 
   if (!emp) return NextResponse.json({ error: 'موظف غير موجود' }, { status: 404 })
   if (emp.role === 'owner') {
     return NextResponse.json({ error: 'لا يمكن حذف سجلات المالك بهذا الشكل' }, { status: 400 })
   }
 
-  let deletedDaily = 0
-  let deletedRecords = 0
+  const results = await Promise.all(
+    months.map(async (month) => {
+      const { from, to } = monthBounds(month)
 
-  for (const month of months) {
-    const [y, mo] = month.split('-').map(Number)
-    const from = `${month}-01`
-    const lastDay = new Date(y, mo, 0).getDate()
-    const to = `${month}-${String(lastDay).padStart(2, '0')}`
-
-    const { data: dRows, error: dErr } = await db
-      .from('daily_attendance')
-      .delete()
-      .eq('employee_id', id)
-      .eq('tenant_id', ctx.tenantId)
-      .gte('work_date', from)
-      .lte('work_date', to)
-      .select('id')
-
-    if (dErr) return NextResponse.json({ error: dErr.message }, { status: 500 })
-    deletedDaily += dRows?.length || 0
-
-    const { data: aRows, error: aErr } = await db
-      .from('attendance_records')
-      .delete()
-      .eq('employee_id', id)
-      .eq('tenant_id', ctx.tenantId)
-      .gte('punched_at', `${from}T00:00:00`)
-      .lte('punched_at', `${to}T23:59:59.999`)
-      .select('id')
-
-    if (!aErr) {
-      deletedRecords += aRows?.length || 0
-    } else {
-      const { data: a2, error: a2Err } = await db
-        .from('attendance_records')
+      const dailyP = db
+        .from('daily_attendance')
         .delete()
         .eq('employee_id', id)
         .eq('tenant_id', ctx.tenantId)
         .gte('work_date', from)
         .lte('work_date', to)
         .select('id')
-      if (!a2Err) deletedRecords += a2?.length || 0
-    }
-  }
+
+      const recordsP = db
+        .from('attendance_records')
+        .delete()
+        .eq('employee_id', id)
+        .eq('tenant_id', ctx.tenantId)
+        .gte('punched_at', `${from}T00:00:00`)
+        .lte('punched_at', `${to}T23:59:59.999`)
+        .select('id')
+
+      const [dailyRes, recordsRes] = await Promise.all([dailyP, recordsP])
+
+      let recCount = recordsRes.data?.length || 0
+      if (recordsRes.error) {
+        const fb = await db
+          .from('attendance_records')
+          .delete()
+          .eq('employee_id', id)
+          .eq('tenant_id', ctx.tenantId)
+          .gte('work_date', from)
+          .lte('work_date', to)
+          .select('id')
+        if (!fb.error) recCount = fb.data?.length || 0
+      }
+
+      if (dailyRes.error) throw new Error(dailyRes.error.message)
+      return { daily: dailyRes.data?.length || 0, records: recCount }
+    })
+  )
+
+  const deletedDaily = results.reduce((s, r) => s + r.daily, 0)
+  const deletedRecords = results.reduce((s, r) => s + r.records, 0)
 
   return NextResponse.json({
     success: true,
-    message: `تم حذف سجلات ${months.length} شهر للموظف ${emp.full_name}`,
+    message: `تم حذف سجلات ${months.length} شهر لـ ${emp.full_name}`,
     deleted_daily: deletedDaily,
     deleted_records: deletedRecords,
     months,

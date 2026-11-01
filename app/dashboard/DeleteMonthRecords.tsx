@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 
 const AR_MONTHS = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر']
 
-function lastMonths(count = 18) {
+function lastMonths(count = 12) {
   const out: { key: string; label: string }[] = []
   const now = new Date()
   for (let i = 0; i < count; i++) {
@@ -26,7 +26,7 @@ export default function DeleteMonthRecords({
   onDone?: () => void
   onToast: (ok: boolean, msg: string) => void
 }) {
-  const months = useMemo(() => lastMonths(18), [])
+  const months = useMemo(() => lastMonths(12), [])
   const [selected, setSelected] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
   const [confirm, setConfirm] = useState(false)
@@ -64,25 +64,26 @@ export default function DeleteMonthRecords({
 
   return (
     <div className="mt-3 pt-3" style={{ borderTop: '1px solid rgba(214,163,75,.2)' }}>
-      <p className="m-0 mb-2 text-xs font-bold" style={{ color: 'var(--gold2)' }}>
-        حذف سجلات حضور لأشهر محددة — {employeeName}
+      <p className="m-0 mb-1 text-xs font-bold" style={{ color: 'var(--gold2)' }}>
+        حذف سجلات حضور — {employeeName}
       </p>
       <p className="m-0 mb-2 text-[11px]" style={{ color: 'var(--muted)' }}>
-        اختر الأشهر التي تريد مسح تقاريرها وسجلات الحضور والانصراف لهذا الموظف فقط.
+        اختر الأشهر (آخر 12 شهر) لمسح حضور وانصراف هذا الموظف فقط.
       </p>
-      <div className="grid grid-cols-2 gap-1.5 max-h-40 overflow-y-auto mb-2" style={{ direction: 'rtl' }}>
+      <div className="grid grid-cols-2 gap-1.5 max-h-36 overflow-y-auto mb-2" style={{ direction: 'rtl' }}>
         {months.map((m) => {
           const on = selected.includes(m.key)
           return (
             <button
               key={m.key}
               type="button"
-              onClick={() => toggle(m.key)}
+              onClick={() => !busy && toggle(m.key)}
               className="text-xs px-2 py-1.5 rounded-lg text-right"
               style={{
                 background: on ? 'rgba(214,163,75,.18)' : '#111920',
                 border: on ? '1px solid var(--gold2)' : '1px solid rgba(180,190,200,.12)',
                 color: on ? 'var(--gold2)' : '#c8d0d6',
+                opacity: busy ? 0.7 : 1,
               }}
             >
               {on ? '✓ ' : ''}{m.label}
@@ -102,11 +103,11 @@ export default function DeleteMonthRecords({
       ) : (
         <div className="space-y-2">
           <p className="m-0 text-xs text-center" style={{ color: '#ffb4b8' }}>
-            تأكيد: سيتم حذف حضور وانصراف الأشهر المحددة لهذا الموظف ولا يمكن التراجع.
+            تأكيد حذف حضور وانصراف الأشهر المحددة لهذا الموظف (لا يمكن التراجع).
           </p>
           <div className="flex gap-2">
             <button type="button" disabled={busy} onClick={runDelete} className="btn-danger flex-1">
-              {busy ? '...' : 'تأكيد الحذف'}
+              {busy ? 'جاري الحذف...' : 'تأكيد الحذف'}
             </button>
             <button type="button" disabled={busy} onClick={() => setConfirm(false)} className="btn-dark flex-1">
               إلغاء
