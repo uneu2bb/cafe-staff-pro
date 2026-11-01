@@ -1,0 +1,7 @@
+const fs = require('fs')
+const path = require('path')
+const root = path.join(__dirname, '..')
+const a = fs.readFileSync(path.join(root, 'app/dashboard/hb-a.txt'), 'utf8')
+const b = fs.readFileSync(path.join(root, 'app/dashboard/hb-b.txt'), 'utf8')
+fs.writeFileSync(path.join(root, 'app/dashboard/HomeBoard.tsx'), a + b)
+console.log('HomeBoard joined', a.length + b.length)
