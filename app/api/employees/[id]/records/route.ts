@@ -9,7 +9,6 @@ function monthBounds(month: string) {
   return { from, to }
 }
 
-/** DELETE body: { months: string[] } e.g. ["2026-10","2026-09"] */
 export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -45,36 +44,14 @@ export async function DELETE(
     months.map(async (month) => {
       const { from, to } = monthBounds(month)
 
-      const dailyP = db
-        .from('daily_attendance')
-        .delete()
-        .eq('employee_id', id)
-        .eq('tenant_id', ctx.tenantId)
-        .gte('work_date', from)
-        .lte('work_date', to)
-        .select('id')
-
-      const recordsP = db
-        .from('attendance_records')
-        .delete()
-        .eq('employee_id', id)
-        .eq('tenant_id', ctx.tenantId)
-        .gte('punched_at', `${from}T00:00:00`)
-        .lte('punched_at', `${to}T23:59:59.999`)
-        .select('id')
-
-      const [dailyRes, recordsRes] = await Promise.all([dailyP, recordsP])
+      const [dailyRes, recordsRes] = await Promise.all([
+        db.from('daily_attendance').delete().eq('employee_id', id).eq('tenant_id', ctx.tenantId).gte('work_date', from).lte('work_date', to).select('id'),
+        db.from('attendance_records').delete().eq('employee_id', id).eq('tenant_id', ctx.tenantId).gte('punched_at', `${from}T00:00:00`).lte('punched_at', `${to}T23:59:59.999`).select('id'),
+      ])
 
       let recCount = recordsRes.data?.length || 0
       if (recordsRes.error) {
-        const fb = await db
-          .from('attendance_records')
-          .delete()
-          .eq('employee_id', id)
-          .eq('tenant_id', ctx.tenantId)
-          .gte('work_date', from)
-          .lte('work_date', to)
-          .select('id')
+        const fb = await db.from('attendance_records').delete().eq('employee_id', id).eq('tenant_id', ctx.tenantId).gte('work_date', from).lte('work_date', to).select('id')
         if (!fb.error) recCount = fb.data?.length || 0
       }
 
