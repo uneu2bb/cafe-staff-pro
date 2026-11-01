@@ -9,40 +9,42 @@ function lastMonths(count = 12) {
   const now = new Date()
   for (let i = 0; i < count; i++) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-    out.push({ key, label: `${AR_MONTHS[d.getMonth()]} ${d.getFullYear()}` })
+    const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0')
+    out.push({ key: key, label: AR_MONTHS[d.getMonth()] + ' ' + d.getFullYear() })
   }
   return out
 }
 
-export default function DeleteMonthRecords({
-  employeeId,
-  employeeName,
-  onDone,
-  onToast,
-}: {
+export default function DeleteMonthRecords(props: {
   employeeId: string
   employeeName: string
   onDone?: () => void
   onToast: (ok: boolean, msg: string) => void
 }) {
-  const months = useMemo(() => lastMonths(12), [])
+  const employeeId = props.employeeId
+  const employeeName = props.employeeName
+  const onDone = props.onDone
+  const onToast = props.onToast
+
+  const months = useMemo(function () { return lastMonths(12) }, [])
   const [selected, setSelected] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
   const [confirm, setConfirm] = useState(false)
 
-  const toggle = (key: string) => {
-    setSelected((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]))
+  function toggle(key: string) {
+    setSelected(function (prev) {
+      return prev.indexOf(key) >= 0 ? prev.filter(function (k) { return k !== key }) : prev.concat([key])
+    })
   }
 
-  const runDelete = async () => {
+  async function runDelete() {
     if (!selected.length) {
       onToast(false, 'اختر شهراً واحداً على الأقل')
       return
     }
     setBusy(true)
     try {
-      const res = await fetch(`/api/employees/${employeeId}/records`, {
+      const res = await fetch('/api/employees/' + employeeId + '/records', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ months: selected }),
@@ -54,9 +56,9 @@ export default function DeleteMonthRecords({
         onToast(true, data.message || 'تم حذف السجلات')
         setSelected([])
         setConfirm(false)
-        onDone?.()
+        if (onDone) onDone()
       }
-    } catch {
+    } catch (e) {
       onToast(false, 'خطأ اتصال')
     }
     setBusy(false)
@@ -68,16 +70,16 @@ export default function DeleteMonthRecords({
         حذف سجلات حضور — {employeeName}
       </p>
       <p className="m-0 mb-2 text-[11px]" style={{ color: 'var(--muted)' }}>
-        اختر الأشهر (آخر 12 شهر) لمسح حضور وانصراف هذا الموظف فقط.
+        اختر من آخر 12 شهر لمسح حضور وانصراف هذا الموظف فقط.
       </p>
       <div className="grid grid-cols-2 gap-1.5 max-h-36 overflow-y-auto mb-2" style={{ direction: 'rtl' }}>
-        {months.map((m) => {
-          const on = selected.includes(m.key)
+        {months.map(function (m) {
+          const on = selected.indexOf(m.key) >= 0
           return (
             <button
               key={m.key}
               type="button"
-              onClick={() => !busy && toggle(m.key)}
+              onClick={function () { if (!busy) toggle(m.key) }}
               className="text-xs px-2 py-1.5 rounded-lg text-right"
               style={{
                 background: on ? 'rgba(214,163,75,.18)' : '#111920',
@@ -86,7 +88,7 @@ export default function DeleteMonthRecords({
                 opacity: busy ? 0.7 : 1,
               }}
             >
-              {on ? '✓ ' : ''}{m.label}
+              {(on ? '✓ ' : '') + m.label}
             </button>
           )
         })}
@@ -95,10 +97,10 @@ export default function DeleteMonthRecords({
         <button
           type="button"
           disabled={!selected.length || busy}
-          onClick={() => setConfirm(true)}
+          onClick={function () { setConfirm(true) }}
           className="btn-danger w-full text-sm"
         >
-          {selected.length ? `حذف سجلات ${selected.length} شهر` : 'اختر أشهراً للحذف'}
+          {selected.length ? ('حذف سجلات ' + selected.length + ' شهر') : 'اختر أشهراً للحذف'}
         </button>
       ) : (
         <div className="space-y-2">
@@ -109,7 +111,7 @@ export default function DeleteMonthRecords({
             <button type="button" disabled={busy} onClick={runDelete} className="btn-danger flex-1">
               {busy ? 'جاري الحذف...' : 'تأكيد الحذف'}
             </button>
-            <button type="button" disabled={busy} onClick={() => setConfirm(false)} className="btn-dark flex-1">
+            <button type="button" disabled={busy} onClick={function () { setConfirm(false) }} className="btn-dark flex-1">
               إلغاء
             </button>
           </div>
