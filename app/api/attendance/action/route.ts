@@ -19,28 +19,35 @@ export async function POST(req: NextRequest) {
   }
 
   const db = adminDb()
-  const { data: employee } = await db
-    .from('profiles')
-    .select('id, full_name, status, branch_id, tenant_id')
-    .eq('id', employee_id)
-    .eq('tenant_id', ctx.tenantId)
-    .single()
-
-  if (!employee || employee.status !== 'active') {
-    return NextResponse.json({ error: 'الموظف غير متاح' }, { status: 404 })
-  }
-
   const method = body.method === 'qr' ? 'qr' : 'manual'
   const now = new Date()
   const workDate = now.toISOString().slice(0, 10)
 
+  const needsDay = action === 'qr_toggle' || action === 'check_in' || action === 'check_out'
+  const [empRes, dayRes] = await Promise.all([
+    db
+      .from('profiles')
+      .select('id, full_name, status, branch_id, tenant_id')
+      .eq('id', employee_id)
+      .eq('tenant_id', ctx.tenantId)
+      .single(),
+    needsDay
+      ? db
+          .from('daily_attendance')
+          .select('id, check_in_at, check_out_at, worked_minutes')
+          .eq('employee_id', employee_id)
+          .eq('work_date', workDate)
+          .maybeSingle()
+      : Promise.resolve({ data: null as any }),
+  ])
+
+  const employee = empRes.data
+  if (!employee || employee.status !== 'active') {
+    return NextResponse.json({ error: 'الموظف غير متاح' }, { status: 404 })
+  }
+
   if (action === 'qr_toggle' || action === 'check_in' || action === 'check_out') {
-    const { data: day } = await db
-      .from('daily_attendance')
-      .select('id, check_in_at, check_out_at, worked_minutes')
-      .eq('employee_id', employee_id)
-      .eq('work_date', workDate)
-      .maybeSingle()
+    const day = dayRes.data
 
     const hasIn = !!(day?.check_in_at)
     const hasOut = !!(day?.check_out_at)
@@ -68,28 +75,30 @@ export async function POST(req: NextRequest) {
         }, { status: 400 })
       }
       const iso = now.toISOString()
-      await db.from('attendance_records').insert({
-        employee_id,
-        tenant_id: ctx.tenantId,
-        record_type: 'check_in',
-        recorded_at: iso,
-        branch_id: employee.branch_id,
-        method,
-      })
-      await db.from('daily_attendance').upsert(
-        {
+      await Promise.all([
+        db.from('attendance_records').insert({
           employee_id,
           tenant_id: ctx.tenantId,
-          work_date: workDate,
+          record_type: 'check_in',
+          recorded_at: iso,
           branch_id: employee.branch_id,
-          status: 'present',
-          check_in_at: iso,
-          check_out_at: null,
-          worked_minutes: null,
-          net_worked_minutes: null,
-        },
-        { onConflict: 'employee_id,work_date' }
-      )
+          method,
+        }),
+        db.from('daily_attendance').upsert(
+          {
+            employee_id,
+            tenant_id: ctx.tenantId,
+            work_date: workDate,
+            branch_id: employee.branch_id,
+            status: 'present',
+            check_in_at: iso,
+            check_out_at: null,
+            worked_minutes: null,
+            net_worked_minutes: null,
+          },
+          { onConflict: 'employee_id,work_date' }
+        ),
+      ])
       return NextResponse.json({
         success: true,
         action: 'check_in',
@@ -99,7 +108,6 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // check_out
     if (!hasIn) {
       return NextResponse.json({
         success: false,
@@ -119,24 +127,26 @@ export async function POST(req: NextRequest) {
     const inAt = new Date(day!.check_in_at as string)
     const workedMinutes = Math.max(0, Math.round((now.getTime() - inAt.getTime()) / 60000))
 
-    await db.from('attendance_records').insert({
-      employee_id,
-      tenant_id: ctx.tenantId,
-      record_type: 'check_out',
-      recorded_at: iso,
-      branch_id: employee.branch_id,
-      method,
-    })
-    await db
-      .from('daily_attendance')
-      .update({
-        check_out_at: iso,
-        worked_minutes: workedMinutes,
-        net_worked_minutes: workedMinutes,
-        status: 'present',
-      })
-      .eq('employee_id', employee_id)
-      .eq('work_date', workDate)
+    await Promise.all([
+      db.from('attendance_records').insert({
+        employee_id,
+        tenant_id: ctx.tenantId,
+        record_type: 'check_out',
+        recorded_at: iso,
+        branch_id: employee.branch_id,
+        method,
+      }),
+      db
+        .from('daily_attendance')
+        .update({
+          check_out_at: iso,
+          worked_minutes: workedMinutes,
+          net_worked_minutes: workedMinutes,
+          status: 'present',
+        })
+        .eq('employee_id', employee_id)
+        .eq('work_date', workDate),
+    ])
 
     return NextResponse.json({
       success: true,
