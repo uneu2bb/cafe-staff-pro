@@ -167,10 +167,8 @@ if (!t.includes('انصراف تلقائي حسب وقت كل موظف')) {
 
 // --- ONLINE SESSION SYNC ---
 if (!t.includes('ONLINE_SESSION_SYNC')) {
-  // Mark so we only inject once
   t = t.replace("'use client'", "'use client'\n/* ONLINE_SESSION_SYNC */")
 
-  // Replace startSession to write check_in online
   const oldStart = `const startSession = (empId: string) => {
     const day = todayMap[empId]
     if (day?.check_in_at && day?.check_out_at) { showToast(false, 'تم حفظ دوام هذا الموظف اليوم'); return }
@@ -215,7 +213,6 @@ if (!t.includes('ONLINE_SESSION_SYNC')) {
 
   if (t.includes(oldStart)) t = t.replace(oldStart, newStart)
 
-  // After building todayMap in load(), rebuild sessions from online open check-ins
   const mapEnd = `setTodayMap(map)
       if (wrRes.ok) setWithdrawals(wrRes.data.withdrawals || [])`
   const mapEndOnline = `setTodayMap(map)
@@ -226,14 +223,12 @@ if (!t.includes('ONLINE_SESSION_SYNC')) {
           if (d.check_in_at && !d.check_out_at) {
             const startMs = new Date(d.check_in_at).getTime()
             const existing = next[empId]
-            // keep local stop state if user already pressed انصراف on this device
             if (existing && !existing.running && existing.endMs) {
               // keep local paused session until save
             } else {
               next[empId] = { startMs, endMs: null, running: true }
             }
           } else if (d.check_in_at && d.check_out_at) {
-            // fully saved online — clear local session
             delete next[empId]
           }
         }
@@ -243,7 +238,6 @@ if (!t.includes('ONLINE_SESSION_SYNC')) {
 
   if (t.includes(mapEnd)) t = t.replace(mapEnd, mapEndOnline)
 
-  // Refresh from cloud when window gains focus / becomes visible
   if (!t.includes('focus online reload')) {
     const afterLoadEffect = 'useEffect(() => { load() }, [load])'
     const withFocus = `useEffect(() => { load() }, [load])
@@ -255,7 +249,7 @@ if (!t.includes('ONLINE_SESSION_SYNC')) {
     const onFocus = () => { void load() }
     document.addEventListener('visibilitychange', onVis)
     window.addEventListener('focus', onFocus)
-    const poll = setInterval(() => { void load() }, 30000)
+    const poll = setInterval(() => { void load() }, 8000)
     return () => {
       document.removeEventListener('visibilitychange', onVis)
       window.removeEventListener('focus', onFocus)
@@ -266,6 +260,88 @@ if (!t.includes('ONLINE_SESSION_SYNC')) {
   }
 }
 
+// --- REALTIME instant sync ---
+if (!t.includes('REALTIME_INSTANT_SYNC')) {
+  // speed up existing poll if present
+  t = t.replace('const poll = setInterval(() => { void load() }, 30000)', 'const poll = setInterval(() => { void load() }, 8000)')
+
+  const anchor = '}, [load])'
+  // Find the focus online reload effect end - inject AFTER the online sync focus effect
+  const realtimeBlock = `
+  // REALTIME_INSTANT_SYNC — instant updates across devices
+  useEffect(() => {
+    const supabase = createClient()
+    const applyDayRow = (row: any) => {
+      if (!row || !row.employee_id) return
+      const today = new Date().toISOString().slice(0, 10)
+      if (row.work_date && String(row.work_date).slice(0, 10) !== today) return
+      let status = row.status || 'none'
+      if (row.check_in_at && row.check_out_at) status = 'checked_out'
+      else if (row.check_in_at) status = 'present'
+      setTodayMap((prev) => ({
+        ...prev,
+        [row.employee_id]: {
+          status,
+          check_in_at: row.check_in_at,
+          check_out_at: row.check_out_at,
+          worked_minutes: row.worked_minutes,
+        },
+      }))
+      setSessions((prev) => {
+        const next = { ...prev }
+        if (row.check_in_at && !row.check_out_at) {
+          const startMs = new Date(row.check_in_at).getTime()
+          const existing = next[row.employee_id]
+          if (!(existing && !existing.running && existing.endMs)) {
+            next[row.employee_id] = { startMs, endMs: null, running: true }
+          }
+        } else if (row.check_in_at && row.check_out_at) {
+          delete next[row.employee_id]
+        }
+        return next
+      })
+    }
+    const channel = supabase
+      .channel('live-attendance')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'daily_attendance' }, (payload: any) => {
+        applyDayRow(payload.new || payload.old)
+        if (payload.eventType === 'DELETE' && payload.old?.employee_id) {
+          setTodayMap((prev) => {
+            const n = { ...prev }
+            delete n[payload.old.employee_id]
+            return n
+          })
+          setSessions((prev) => {
+            const n = { ...prev }
+            delete n[payload.old.employee_id]
+            return n
+          })
+        }
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'employee_withdrawals' }, () => {
+        void load()
+      })
+      .subscribe()
+    return () => {
+      void supabase.removeChannel(channel)
+    }
+  }, [load])
+`
+
+  // Insert after the focus-online effect if present, else after first load effect
+  if (t.includes('focus online reload')) {
+    // append after the poll effect's closing
+    const focusEnd = `clearInterval(poll)
+    }
+  }, [load])`
+    if (t.includes(focusEnd) && !t.includes('REALTIME_INSTANT_SYNC')) {
+      t = t.replace(focusEnd, focusEnd + realtimeBlock)
+    }
+  } else if (t.includes("useEffect(() => { load() }, [load])") && !t.includes('REALTIME_INSTANT_SYNC')) {
+    t = t.replace("useEffect(() => { load() }, [load])", "useEffect(() => { load() }, [load])" + realtimeBlock)
+  }
+}
+
 fs.writeFileSync(path.join(dir, 'HomeBoard.tsx'), t)
 console.log(
   'HomeBoard joined',
@@ -273,5 +349,6 @@ console.log(
   t.includes('DeleteMonthRecords') ? '+DeleteMonthRecords' : '',
   t.includes('auto_checkout_time') ? '+autoCheckout' : '',
   t.includes('FancyTimePicker') ? '+FancyTime' : '',
-  t.includes('ONLINE_SESSION_SYNC') ? '+OnlineSync' : ''
+  t.includes('ONLINE_SESSION_SYNC') ? '+OnlineSync' : '',
+  t.includes('REALTIME_INSTANT_SYNC') ? '+Realtime' : ''
 )
