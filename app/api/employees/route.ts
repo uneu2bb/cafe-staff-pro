@@ -9,14 +9,27 @@ export async function GET() {
   const { data, error } = await db
     .from('profiles')
     .select(
-      'id, full_name, employee_number, salary_amount, salary_type, hire_date, work_hours_per_day, weekly_off_days, status, job_title, phone, notes, pin_code, role'
+      'id, full_name, employee_number, salary_amount, salary_type, hire_date, work_hours_per_day, weekly_off_days, status, job_title, phone, notes, pin_code, role, auto_checkout_time'
     )
     .eq('tenant_id', ctx.tenantId)
     .eq('role', 'employee')
     .in('status', ['active', 'suspended'])
     .order('full_name')
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) {
+    // fallback if column not migrated yet
+    const fb = await db
+      .from('profiles')
+      .select(
+        'id, full_name, employee_number, salary_amount, salary_type, hire_date, work_hours_per_day, weekly_off_days, status, job_title, phone, notes, pin_code, role'
+      )
+      .eq('tenant_id', ctx.tenantId)
+      .eq('role', 'employee')
+      .in('status', ['active', 'suspended'])
+      .order('full_name')
+    if (fb.error) return NextResponse.json({ error: fb.error.message }, { status: 500 })
+    return NextResponse.json({ employees: fb.data || [], tenantId: ctx.tenantId })
+  }
   return NextResponse.json({ employees: data || [], tenantId: ctx.tenantId })
 }
 
@@ -36,6 +49,7 @@ export async function POST(req: NextRequest) {
     phone,
     notes,
     pin_code = '0000',
+    auto_checkout_time,
   } = body
 
   if (!full_name || !employee_number) {
@@ -56,7 +70,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'الرقم الوظيفي مستخدم في مقهاك' }, { status: 409 })
   }
 
-  // حساب Auth داخلي للموظف (ما يستخدمه للدخول للوحة)
   const email = `emp-${ctx.tenantId.slice(0, 8)}-${empNo}@cafestaff.local`
   const password = `Emp${empNo}!${pin_code || '0000'}`
 
@@ -71,27 +84,31 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: authError?.message || 'فشل إنشاء الحساب' }, { status: 500 })
   }
 
-  const { data, error } = await db
-    .from('profiles')
-    .upsert({
-      id: authData.user.id,
-      tenant_id: ctx.tenantId,
-      full_name: String(full_name).trim(),
-      employee_number: empNo,
-      salary_amount: Number(salary_amount) || 0,
-      salary_type: 'monthly',
-      hire_date: hire_date || null,
-      work_hours_per_day: Number(work_hours_per_day) || 8,
-      weekly_off_days: weekly_off_days || [5, 6],
-      job_title: job_title || null,
-      phone: phone || null,
-      notes: notes || null,
-      pin_code: String(pin_code),
-      role: 'employee',
-      status: 'active',
-    })
-    .select()
-    .single()
+  const autoTime =
+    auto_checkout_time && /^\d{2}:\d{2}$/.test(String(auto_checkout_time))
+      ? String(auto_checkout_time)
+      : null
+
+  const row: Record<string, unknown> = {
+    id: authData.user.id,
+    tenant_id: ctx.tenantId,
+    full_name: String(full_name).trim(),
+    employee_number: empNo,
+    salary_amount: Number(salary_amount) || 0,
+    salary_type: 'monthly',
+    hire_date: hire_date || null,
+    work_hours_per_day: Number(work_hours_per_day) || 8,
+    weekly_off_days: weekly_off_days || [5, 6],
+    job_title: job_title || null,
+    phone: phone || null,
+    notes: notes || null,
+    pin_code: String(pin_code),
+    role: 'employee',
+    status: 'active',
+  }
+  if (autoTime) row.auto_checkout_time = autoTime
+
+  const { data, error } = await db.from('profiles').upsert(row).select().single()
 
   if (error) {
     await db.auth.admin.deleteUser(authData.user.id)

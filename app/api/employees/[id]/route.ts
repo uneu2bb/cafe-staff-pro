@@ -12,7 +12,6 @@ export async function PATCH(
   const body = await req.json()
   const db = adminDb()
 
-  // تأكد أن الموظف يتبع نفس المقهى
   const { data: emp } = await db
     .from('profiles')
     .select('id, tenant_id, role')
@@ -34,6 +33,12 @@ export async function PATCH(
   if (body.notes !== undefined) patch.notes = body.notes || null
   if (body.pin_code !== undefined) patch.pin_code = String(body.pin_code || '0000')
   if (body.status != null) patch.status = body.status
+  if (body.auto_checkout_time !== undefined) {
+    const t = body.auto_checkout_time
+    if (t === null || t === '') patch.auto_checkout_time = null
+    else if (/^\d{2}:\d{2}$/.test(String(t))) patch.auto_checkout_time = String(t)
+    else return NextResponse.json({ error: 'وقت الانصراف التلقائي غير صالح (HH:mm)' }, { status: 400 })
+  }
 
   const { data, error } = await db
     .from('profiles')
@@ -43,7 +48,15 @@ export async function PATCH(
     .select()
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) {
+    // column may not exist yet
+    if (String(error.message || '').includes('auto_checkout_time')) {
+      return NextResponse.json({
+        error: 'شغّل ملف supabase/auto_checkout.sql في Supabase أولاً',
+      }, { status: 400 })
+    }
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
   return NextResponse.json({ success: true, employee: data })
 }
 
@@ -69,7 +82,6 @@ export async function DELETE(
     return NextResponse.json({ error: 'لا يمكن حذف المالك' }, { status: 400 })
   }
 
-  // soft delete
   const { error } = await db
     .from('profiles')
     .update({ status: 'resigned' })
