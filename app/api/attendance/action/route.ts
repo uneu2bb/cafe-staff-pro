@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
   const now = new Date()
   const workDate = now.toISOString().slice(0, 10)
 
-  const needsDay = action === 'qr_toggle' || action === 'check_in' || action === 'check_out'
+  const needsDay = action === 'qr_toggle' || action === 'check_in' || action === 'check_out' || action === 'save_session'
   const [empRes, dayRes] = await Promise.all([
     db
       .from('profiles')
@@ -68,11 +68,15 @@ export async function POST(req: NextRequest) {
 
     if (resolved === 'check_in') {
       if (hasIn) {
+        // already online — return existing so other devices can resume timer
         return NextResponse.json({
-          success: false,
-          error: `«${employee.full_name}» مسجّل حضور مسبقاً`,
+          success: true,
+          action: 'check_in',
+          message: `«${employee.full_name}» مسجّل حضور مسبقاً`,
           employee_name: employee.full_name,
-        }, { status: 400 })
+          check_in_at: day!.check_in_at,
+          already: true,
+        })
       }
       const iso = now.toISOString()
       await Promise.all([
@@ -123,9 +127,10 @@ export async function POST(req: NextRequest) {
       }, { status: 400 })
     }
 
-    const iso = now.toISOString()
+    const iso = body.check_out_at ? new Date(body.check_out_at).toISOString() : now.toISOString()
+    const outDate = new Date(iso)
     const inAt = new Date(day!.check_in_at as string)
-    const workedMinutes = Math.max(0, Math.round((now.getTime() - inAt.getTime()) / 60000))
+    const workedMinutes = Math.max(0, Math.round((outDate.getTime() - inAt.getTime()) / 60000))
 
     await Promise.all([
       db.from('attendance_records').insert({
@@ -174,6 +179,41 @@ export async function POST(req: NextRequest) {
 
     const wd = checkInAt.toISOString().slice(0, 10)
     const workedMinutes = Math.round((checkOutAt.getTime() - checkInAt.getTime()) / 60000)
+    const day = dayRes.data
+
+    // If already checked in online today, only finalize checkout (no duplicate check_in)
+    if (day?.check_in_at && !day?.check_out_at) {
+      const inIso = day.check_in_at as string
+      const outIso = checkOutAt.toISOString()
+      const mins = Math.max(0, Math.round((checkOutAt.getTime() - new Date(inIso).getTime()) / 60000))
+      await Promise.all([
+        db.from('attendance_records').insert({
+          employee_id,
+          tenant_id: ctx.tenantId,
+          record_type: 'check_out',
+          recorded_at: outIso,
+          branch_id: employee.branch_id,
+          method: 'manual',
+        }),
+        db
+          .from('daily_attendance')
+          .update({
+            check_out_at: outIso,
+            worked_minutes: mins,
+            net_worked_minutes: mins,
+            status: 'present',
+          })
+          .eq('employee_id', employee_id)
+          .eq('work_date', wd),
+      ])
+      return NextResponse.json({
+        success: true,
+        message: 'تم حفظ الدوام',
+        check_in_at: inIso,
+        check_out_at: outIso,
+        worked_minutes: mins,
+      })
+    }
 
     await db.from('attendance_records').insert([
       {

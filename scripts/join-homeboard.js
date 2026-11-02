@@ -45,7 +45,6 @@ if (!t.includes('DeleteMonthRecords')) {
   if (t.includes(needle)) t = t.replace(needle, inject)
 }
 
-// --- FancyTimePicker import ---
 if (!t.includes('FancyTimePicker')) {
   if (t.includes("import DeleteMonthRecords from './DeleteMonthRecords'")) {
     t = t.replace(
@@ -62,7 +61,6 @@ if (!t.includes('FancyTimePicker')) {
   }
 }
 
-// --- inject auto_checkout_time support ---
 if (!t.includes('auto_checkout_time')) {
   t = t.replace(
     'type Employee = { id: string; full_name: string; employee_number: string; salary_amount: number; work_hours_per_day: number; status: string; job_title: string | null; phone: string | null; pin_code: string | null; hire_date: string | null; notes: string | null }',
@@ -85,7 +83,6 @@ if (!t.includes('auto_checkout_time')) {
   )
 }
 
-// Replace native time input (or previous inject) with FancyTimePicker
 {
   const nativeBlock =
     '<div><label className="label">انصراف تلقائي (وقت الإيقاف والحفظ)</label><input className="input-field" type="time" value={editForm.auto_checkout_time || \'\'} onChange={(e) => setEditForm({ ...editForm, auto_checkout_time: e.target.value })} dir="ltr" /><p className="m-0 mt-1 text-[11px]" style={{ color: \'var(--muted)\' }}>عند حلول هذا الوقت يُوقف التايمر ويُحفظ الدوام تلقائياً إذا كانت الشاشة مفتوحة.</p></div>'
@@ -96,7 +93,6 @@ if (!t.includes('auto_checkout_time')) {
   if (t.includes(nativeBlock)) {
     t = t.replace(nativeBlock, fancyBlock)
   } else if (!t.includes('FancyTimePicker value={editForm.auto_checkout_time')) {
-    // insert after phone field
     const phoneField =
       '<div><label className="label">واتساب / هاتف دولي</label><input className="input-field" value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} dir="ltr" placeholder="+90 5xx xxx xxxx" style={{ textAlign: \'left\' }} /></div>'
     if (t.includes(phoneField)) {
@@ -105,7 +101,6 @@ if (!t.includes('auto_checkout_time')) {
   }
 }
 
-// Auto checkout effect
 if (!t.includes('انصراف تلقائي حسب وقت كل موظف')) {
   const marker = '}, [hasRunningSession])'
   const autoEffect = `}, [hasRunningSession])
@@ -170,11 +165,113 @@ if (!t.includes('انصراف تلقائي حسب وقت كل موظف')) {
   if (t.includes(marker)) t = t.replace(marker, autoEffect)
 }
 
+// --- ONLINE SESSION SYNC ---
+if (!t.includes('ONLINE_SESSION_SYNC')) {
+  // Mark so we only inject once
+  t = t.replace("'use client'", "'use client'\n/* ONLINE_SESSION_SYNC */")
+
+  // Replace startSession to write check_in online
+  const oldStart = `const startSession = (empId: string) => {
+    const day = todayMap[empId]
+    if (day?.check_in_at && day?.check_out_at) { showToast(false, 'تم حفظ دوام هذا الموظف اليوم'); return }
+    if (sessions[empId]?.running) return
+    setSessions((prev) => ({ ...prev, [empId]: { startMs: Date.now(), endMs: null, running: true } }))
+    showToast(true, 'بدأت الساعة')
+  }`
+
+  const newStart = `const startSession = async (empId: string) => {
+    const day = todayMap[empId]
+    if (day?.check_in_at && day?.check_out_at) { showToast(false, 'تم حفظ دوام هذا الموظف اليوم'); return }
+    if (sessions[empId]?.running) return
+    setBusyId(empId)
+    try {
+      const res = await fetch('/api/attendance/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ employee_id: empId, action: 'check_in', method: 'manual' }),
+      })
+      const data = await res.json()
+      if (!res.ok || data.success === false) {
+        showToast(false, data.error || 'فشل تسجيل الحضور')
+      } else {
+        const startMs = data.check_in_at ? new Date(data.check_in_at).getTime() : Date.now()
+        setSessions((prev) => ({ ...prev, [empId]: { startMs, endMs: null, running: true } }))
+        setTodayMap((prev) => ({
+          ...prev,
+          [empId]: {
+            status: 'present',
+            check_in_at: data.check_in_at,
+            check_out_at: null,
+            worked_minutes: null,
+          },
+        }))
+        showToast(true, data.already ? 'استئناف الحضور من السحابة' : 'بدأت الساعة (محفوظ أونلاين)')
+      }
+    } catch {
+      showToast(false, 'خطأ اتصال — لم يُحفظ أونلاين')
+    }
+    setBusyId(null)
+  }`
+
+  if (t.includes(oldStart)) t = t.replace(oldStart, newStart)
+
+  // After building todayMap in load(), rebuild sessions from online open check-ins
+  const mapEnd = `setTodayMap(map)
+      if (wrRes.ok) setWithdrawals(wrRes.data.withdrawals || [])`
+  const mapEndOnline = `setTodayMap(map)
+      // ONLINE: resume running sessions from cloud (any device)
+      setSessions((prev) => {
+        const next: Record<string, Session> = { ...prev }
+        for (const [empId, d] of Object.entries(map) as [string, DayInfo][]) {
+          if (d.check_in_at && !d.check_out_at) {
+            const startMs = new Date(d.check_in_at).getTime()
+            const existing = next[empId]
+            // keep local stop state if user already pressed انصراف on this device
+            if (existing && !existing.running && existing.endMs) {
+              // keep local paused session until save
+            } else {
+              next[empId] = { startMs, endMs: null, running: true }
+            }
+          } else if (d.check_in_at && d.check_out_at) {
+            // fully saved online — clear local session
+            delete next[empId]
+          }
+        }
+        return next
+      })
+      if (wrRes.ok) setWithdrawals(wrRes.data.withdrawals || [])`
+
+  if (t.includes(mapEnd)) t = t.replace(mapEnd, mapEndOnline)
+
+  // Refresh from cloud when window gains focus / becomes visible
+  if (!t.includes('focus online reload')) {
+    const afterLoadEffect = 'useEffect(() => { load() }, [load])'
+    const withFocus = `useEffect(() => { load() }, [load])
+  // focus online reload — sync sessions across devices
+  useEffect(() => {
+    const onVis = () => {
+      if (document.visibilityState === 'visible') void load()
+    }
+    const onFocus = () => { void load() }
+    document.addEventListener('visibilitychange', onVis)
+    window.addEventListener('focus', onFocus)
+    const poll = setInterval(() => { void load() }, 30000)
+    return () => {
+      document.removeEventListener('visibilitychange', onVis)
+      window.removeEventListener('focus', onFocus)
+      clearInterval(poll)
+    }
+  }, [load])`
+    if (t.includes(afterLoadEffect)) t = t.replace(afterLoadEffect, withFocus)
+  }
+}
+
 fs.writeFileSync(path.join(dir, 'HomeBoard.tsx'), t)
 console.log(
   'HomeBoard joined',
   t.length,
   t.includes('DeleteMonthRecords') ? '+DeleteMonthRecords' : '',
   t.includes('auto_checkout_time') ? '+autoCheckout' : '',
-  t.includes('FancyTimePicker') ? '+FancyTime' : ''
+  t.includes('FancyTimePicker') ? '+FancyTime' : '',
+  t.includes('ONLINE_SESSION_SYNC') ? '+OnlineSync' : ''
 )
