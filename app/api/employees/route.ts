@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { adminDb, requireTenant } from '@/lib/tenant'
 
+const EMP_SELECT =
+  'id, full_name, employee_number, salary_amount, salary_type, hire_date, work_hours_per_day, weekly_off_days, status, job_title, phone, notes, pin_code, role, auto_checkout_time'
+const EMP_SELECT_FB =
+  'id, full_name, employee_number, salary_amount, salary_type, hire_date, work_hours_per_day, weekly_off_days, status, job_title, phone, notes, pin_code, role'
+
 export async function GET() {
   const ctx = await requireTenant(['owner', 'manager', 'accountant'])
   if (!ctx) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 })
@@ -8,29 +13,30 @@ export async function GET() {
   const db = adminDb()
   const { data, error } = await db
     .from('profiles')
-    .select(
-      'id, full_name, employee_number, salary_amount, salary_type, hire_date, work_hours_per_day, weekly_off_days, status, job_title, phone, notes, pin_code, role, auto_checkout_time'
-    )
+    .select(EMP_SELECT)
     .eq('tenant_id', ctx.tenantId)
     .eq('role', 'employee')
     .in('status', ['active', 'suspended'])
     .order('full_name')
 
   if (error) {
-    // fallback if column not migrated yet
     const fb = await db
       .from('profiles')
-      .select(
-        'id, full_name, employee_number, salary_amount, salary_type, hire_date, work_hours_per_day, weekly_off_days, status, job_title, phone, notes, pin_code, role'
-      )
+      .select(EMP_SELECT_FB)
       .eq('tenant_id', ctx.tenantId)
       .eq('role', 'employee')
       .in('status', ['active', 'suspended'])
       .order('full_name')
     if (fb.error) return NextResponse.json({ error: fb.error.message }, { status: 500 })
-    return NextResponse.json({ employees: fb.data || [], tenantId: ctx.tenantId })
+    return NextResponse.json(
+      { employees: fb.data || [], tenantId: ctx.tenantId },
+      { headers: { 'Cache-Control': 'private, max-age=5, stale-while-revalidate=15' } }
+    )
   }
-  return NextResponse.json({ employees: data || [], tenantId: ctx.tenantId })
+  return NextResponse.json(
+    { employees: data || [], tenantId: ctx.tenantId },
+    { headers: { 'Cache-Control': 'private, max-age=5, stale-while-revalidate=15' } }
+  )
 }
 
 export async function POST(req: NextRequest) {
@@ -77,7 +83,7 @@ export async function POST(req: NextRequest) {
     email,
     password,
     email_confirm: true,
-    user_metadata: { full_name: String(full_name).trim(), role: 'employee', tenant_id: ctx.tenantId },
+    user_metadata: { full_name: String(full_name).trim(), tenant_id: ctx.tenantId },
   })
 
   if (authError || !authData.user) {

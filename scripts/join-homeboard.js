@@ -239,5 +239,124 @@ if (!t.includes('STOP_SAVES_ONLINE')) {
   if (t.includes(oldStop)) t = t.replace(oldStop, newStop)
 }
 
+// --- PERF: light attendance refresh + debounced focus + less aggressive poll ---
+if (!t.includes('PERF_LIGHT_REFRESH')) {
+  t = t.replace("'use client'", "'use client'\n/* PERF_LIGHT_REFRESH */")
+
+  // Guard concurrent full loads
+  if (!t.includes('loadInFlightRef')) {
+    t = t.replace(
+      'const [loading, setLoading] = useState(true)',
+      'const [loading, setLoading] = useState(true)\n  const loadInFlightRef = useRef(false)\n  const lastFullLoadRef = useRef(0)'
+    )
+  }
+
+  // Wrap load body with in-flight guard
+  const loadStart = 'const load = useCallback(async () => {\n    try {'
+  const loadStartGuarded = `const load = useCallback(async () => {
+    if (loadInFlightRef.current) return
+    loadInFlightRef.current = true
+    lastFullLoadRef.current = Date.now()
+    try {`
+  if (t.includes(loadStart)) t = t.replace(loadStart, loadStartGuarded)
+
+  const loadEnd = `} catch (e: unknown) { showToast(false, e instanceof Error ? e.message : 'خطأ') }
+    setLoading(false)
+  }, [])`
+  const loadEndGuarded = `} catch (e: unknown) { showToast(false, e instanceof Error ? e.message : 'خطأ') }
+    setLoading(false)
+    loadInFlightRef.current = false
+  }, [])
+
+  // light refresh: attendance only (no employees/withdrawals API)
+  const refreshAttendance = useCallback(async () => {
+    try {
+      const supabase = createClient()
+      const today = new Date().toISOString().slice(0, 10)
+      const { data } = await supabase
+        .from('daily_attendance')
+        .select('employee_id, status, check_in_at, check_out_at, worked_minutes, work_date')
+        .eq('work_date', today)
+      const map: Record<string, DayInfo> = {}
+      for (const d of data || []) {
+        let status = d.status || 'none'
+        if (d.check_in_at && d.check_out_at) status = 'checked_out'
+        else if (d.check_in_at) status = 'present'
+        map[d.employee_id] = { status, check_in_at: d.check_in_at, check_out_at: d.check_out_at, worked_minutes: d.worked_minutes }
+      }
+      setTodayMap(map)
+      setSessions((prev) => {
+        const next: Record<string, Session> = { ...prev }
+        for (const [empId, d] of Object.entries(map) as [string, DayInfo][]) {
+          if (d.check_in_at && !d.check_out_at) {
+            const startMs = new Date(d.check_in_at).getTime()
+            const existing = next[empId]
+            if (!(existing && !existing.running && existing.endMs)) next[empId] = { startMs, endMs: null, running: true }
+          } else if (d.check_in_at && d.check_out_at) {
+            delete next[empId]
+          }
+        }
+        return next
+      })
+    } catch {}
+  }, [])`
+  if (t.includes(loadEnd)) t = t.replace(loadEnd, loadEndGuarded)
+
+  // Replace aggressive poll/focus with debounced + light refresh
+  const oldPollBlock = `// focus online reload
+  useEffect(() => {
+    const onVis = () => { if (document.visibilityState === 'visible') void load() }
+    const onFocus = () => { void load() }
+    document.addEventListener('visibilitychange', onVis)
+    window.addEventListener('focus', onFocus)
+    const poll = setInterval(() => { void load() }, 8000)
+    return () => {
+      document.removeEventListener('visibilitychange', onVis)
+      window.removeEventListener('focus', onFocus)
+      clearInterval(poll)
+    }
+  }, [load])`
+
+  const newPollBlock = `// PERF: debounced focus + light attendance poll (realtime handles instant)
+  useEffect(() => {
+    let focusTimer: ReturnType<typeof setTimeout> | null = null
+    const softReload = () => {
+      if (focusTimer) clearTimeout(focusTimer)
+      focusTimer = setTimeout(() => {
+        // full load at most every 20s on focus
+        if (Date.now() - lastFullLoadRef.current > 20000) void load()
+        else void refreshAttendance()
+      }, 400)
+    }
+    const onVis = () => { if (document.visibilityState === 'visible') softReload() }
+    document.addEventListener('visibilitychange', onVis)
+    window.addEventListener('focus', softReload)
+    const poll = setInterval(() => {
+      if (document.visibilityState !== 'visible') return
+      void refreshAttendance()
+    }, 18000)
+    return () => {
+      if (focusTimer) clearTimeout(focusTimer)
+      document.removeEventListener('visibilitychange', onVis)
+      window.removeEventListener('focus', softReload)
+      clearInterval(poll)
+    }
+  }, [load, refreshAttendance])`
+
+  if (t.includes(oldPollBlock)) {
+    t = t.replace(oldPollBlock, newPollBlock)
+  } else {
+    // try variant with 30000
+    const alt = oldPollBlock.replace('8000', '30000')
+    if (t.includes(alt)) t = t.replace(alt, newPollBlock)
+  }
+}
+
 fs.writeFileSync(path.join(dir, 'HomeBoard.tsx'), t)
-console.log('HomeBoard joined', t.length, t.includes('STOP_SAVES_ONLINE') ? '+StopOnline' : '', t.includes('REALTIME_INSTANT_SYNC') ? '+Realtime' : '')
+console.log(
+  'HomeBoard joined',
+  t.length,
+  t.includes('STOP_SAVES_ONLINE') ? '+StopOnline' : '',
+  t.includes('REALTIME_INSTANT_SYNC') ? '+Realtime' : '',
+  t.includes('PERF_LIGHT_REFRESH') ? '+Perf' : ''
+)
