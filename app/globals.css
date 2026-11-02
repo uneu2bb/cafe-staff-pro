@@ -134,7 +134,7 @@ button { cursor: pointer; }
 .card {
   background: linear-gradient(160deg, rgba(20, 30, 40, 0.95) 0%, rgba(10, 16, 22, 0.98) 100%);
   border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border-radius: 18px;
   box-shadow: var(--shadow);
   padding: 16px;
   backdrop-filter: blur(12px);
@@ -155,8 +155,7 @@ button { cursor: pointer; }
   min-height: 108px;
   border: 1px solid var(--line);
   border-radius: 18px;
-  background:
-    linear-gradient(145deg, rgba(24, 34, 44, 0.98) 0%, rgba(9, 14, 18, 0.99) 100%);
+  background: linear-gradient(145deg, rgba(24, 34, 44, 0.98) 0%, rgba(9, 14, 18, 0.99) 100%);
   padding: 18px 18px;
   display: flex;
   align-items: center;
@@ -232,21 +231,43 @@ button { cursor: pointer; }
   align-items: center;
   justify-content: center;
   padding: 18px;
-  background: rgba(0, 0, 0, 0.78);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: rgba(2, 4, 8, 0.82);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   animation: fadeIn 0.2s ease;
 }
 .modal-panel {
   width: min(460px, 100%);
   max-height: 90vh;
   overflow-y: auto;
-  background: linear-gradient(165deg, #141e28 0%, #0c1319 100%);
+  background:
+    radial-gradient(ellipse 80% 40% at 50% 0%, rgba(214, 168, 79, 0.08), transparent 55%),
+    linear-gradient(165deg, #151f2a 0%, #0c1319 55%, #0a1015 100%);
   border: 1px solid var(--line-strong);
-  border-radius: 20px;
-  padding: 24px;
-  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(214, 168, 79, 0.08);
-  animation: scaleIn 0.22s ease;
+  border-radius: 22px;
+  padding: 26px;
+  box-shadow:
+    0 32px 90px rgba(0, 0, 0, 0.7),
+    0 0 0 1px rgba(214, 168, 79, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  animation: scaleIn 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.modal-panel h2,
+.modal-panel h3 {
+  color: var(--gold2) !important;
+  font-weight: 900 !important;
+  letter-spacing: 0.01em;
+}
+.modal-panel .btn-gold,
+.modal-panel .btn-dark,
+.modal-panel .btn-danger {
+  border-radius: 12px;
+}
+
+/* Report modal wider polish */
+.modal-panel[style*='520'],
+.modal-panel[style*='maxWidth'] {
+  border-radius: 24px;
 }
 
 /* ========== Sidebar ========== */
@@ -261,8 +282,7 @@ aside.csp-sidebar::before {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background:
-    radial-gradient(ellipse 80% 40% at 50% 0%, rgba(214, 168, 79, 0.07), transparent 60%);
+  background: radial-gradient(ellipse 80% 40% at 50% 0%, rgba(214, 168, 79, 0.07), transparent 60%);
 }
 aside.csp-sidebar .side-nav-item {
   position: relative;
@@ -311,8 +331,7 @@ aside.csp-sidebar .side-nav-item {
   padding: 5px 13px;
   color: white;
   min-width: 64px;
-  text-align: center;
-  background: var(--green);
+  text-align: center;\n  background: var(--green);
   display: inline-block;
   font-weight: 800;
   letter-spacing: 0.02em;
@@ -324,10 +343,7 @@ aside.csp-sidebar .side-nav-item {
 .pill.blue { background: linear-gradient(135deg, #3a7eb8, #5aa3e0); }
 
 /* ========== Tables ========== */
-table {
-  border-collapse: separate;
-  border-spacing: 0;
-}
+table { border-collapse: separate; border-spacing: 0; }
 table thead th {
   font-size: 11px;
   font-weight: 800;
@@ -343,14 +359,8 @@ table tbody td {
   font-size: 13px;
   vertical-align: middle;
 }
-table tbody tr {
-  transition: background 0.15s;
-}
-table tbody tr:hover {
-  background: rgba(214, 168, 79, 0.045);
-}
-
-/* Action buttons inside employee table */
+table tbody tr { transition: background 0.15s; }
+table tbody tr:hover { background: rgba(214, 168, 79, 0.045); }
 table tbody td button {
   border-radius: 9px !important;
   transition: transform 0.15s, filter 0.15s, box-shadow 0.15s !important;
@@ -359,11 +369,9 @@ table tbody td button:hover:not(:disabled) {
   transform: translateY(-1px);
   filter: brightness(1.12);
 }
-table tbody td button:disabled {
-  opacity: 0.35;
-}
+table tbody td button:disabled { opacity: 0.35; }
 
-/* ========== Section headers in cards ========== */
+/* ========== Section headers ========== */
 .card > h3 {
   display: flex;
   align-items: center;
@@ -375,7 +383,6 @@ table tbody td button:disabled {
   font-weight: 900 !important;
 }
 
-/* Search input in employee list */
 .card input[type="search"],
 .card input[placeholder*="ابحث"] {
   border-radius: 12px !important;
@@ -383,10 +390,50 @@ table tbody td button:disabled {
   border: 1px solid rgba(120, 135, 150, 0.22) !important;
 }
 
-/* Top header bar inside main */
-.csp-main-wrap > header,
-.csp-main-wrap > div:first-child {
-  /* soft glass header feel when applicable */
+/* ========== Withdrawals section ========== */
+#withdrawals-section {
+  position: relative;
+  overflow: hidden;
+}
+#withdrawals-section::before {
+  content: '';
+  position: absolute;
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(214, 168, 79, 0.07), transparent 70%);
+  top: -60px;
+  left: -40px;
+  pointer-events: none;
+}
+#withdrawals-section table tbody td:nth-child(2) {
+  font-weight: 800;
+  color: var(--gold2) !important;
+}
+
+/* Report summary mini-cards inside modal */
+.report-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.report-stat {
+  background: linear-gradient(145deg, rgba(20, 30, 40, 0.95), rgba(10, 15, 20, 0.98));
+  border: 1px solid rgba(214, 168, 79, 0.2);
+  border-radius: 14px;
+  padding: 12px 14px;
+  text-align: center;
+}
+.report-stat .val {
+  font-size: 18px;
+  font-weight: 900;
+  color: var(--gold2);
+}
+.report-stat .lbl {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
 }
 
 /* ========== Charts ========== */
@@ -474,11 +521,8 @@ table tbody td button:disabled {
   border-radius: 8px;
 }
 
-/* Employee table wrapper polish */
 #employees-section,
-section.card {
-  border-radius: 18px;
-}
+section.card { border-radius: 18px; }
 #employees-section .overflow-x-auto,
 section.card .overflow-x-auto {
   border-radius: 14px;
@@ -486,10 +530,14 @@ section.card .overflow-x-auto {
   background: rgba(0, 0, 0, 0.15);
 }
 
-/* Timer running glow */
 table tbody td .font-bold[style*="55d39d"],
 table tbody td[style*="55d39d"] {
   text-shadow: 0 0 12px rgba(85, 211, 157, 0.35);
+}
+
+/* Toast-like success areas inside modals */
+.modal-panel .text-center[style*="muted"] {
+  letter-spacing: 0.02em;
 }
 
 @media (max-width: 760px) {
@@ -502,9 +550,13 @@ table tbody td[style*="55d39d"] {
   }
   .modal-panel {
     padding: 18px;
-    border-radius: 16px;
+    border-radius: 18px;
   }
   aside.csp-sidebar {
     box-shadow: -8px 0 32px rgba(0, 0, 0, 0.5);
+  }
+  .report-stat-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
   }
 }
