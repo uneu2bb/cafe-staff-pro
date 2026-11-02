@@ -45,6 +45,23 @@ if (!t.includes('DeleteMonthRecords')) {
   if (t.includes(needle)) t = t.replace(needle, inject)
 }
 
+// --- FancyTimePicker import ---
+if (!t.includes('FancyTimePicker')) {
+  if (t.includes("import DeleteMonthRecords from './DeleteMonthRecords'")) {
+    t = t.replace(
+      "import DeleteMonthRecords from './DeleteMonthRecords'",
+      "import DeleteMonthRecords from './DeleteMonthRecords'\nimport FancyTimePicker from './FancyTimePicker'"
+    )
+  } else if (t.includes("import { EmployeeWithdrawalFile } from './EmployeeWithdrawalFile'")) {
+    t = t.replace(
+      "import { EmployeeWithdrawalFile } from './EmployeeWithdrawalFile'",
+      "import { EmployeeWithdrawalFile } from './EmployeeWithdrawalFile'\nimport FancyTimePicker from './FancyTimePicker'"
+    )
+  } else {
+    t = t.replace("'use client'\n", "'use client'\n\nimport FancyTimePicker from './FancyTimePicker'\n")
+  }
+}
+
 // --- inject auto_checkout_time support ---
 if (!t.includes('auto_checkout_time')) {
   t = t.replace(
@@ -62,18 +79,34 @@ if (!t.includes('auto_checkout_time')) {
     "const openEdit = (emp: Employee) => { setEditEmp(emp); setEditForm({ full_name: emp.full_name, salary_amount: String(emp.salary_amount || 0), work_hours_per_day: String(emp.work_hours_per_day || 8), job_title: emp.job_title || '', phone: emp.phone || '', pin_code: emp.pin_code || '', notes: emp.notes || '', auto_checkout_time: emp.auto_checkout_time || '' }) }"
   )
 
-  // saveEdit body include auto_checkout_time
   t = t.replace(
     'body: JSON.stringify({ full_name: editForm.full_name, salary_amount: Number(editForm.salary_amount) || 0, work_hours_per_day: Number(editForm.work_hours_per_day) || 8, job_title: editForm.job_title || null, phone: editForm.phone || null, pin_code: editForm.pin_code || null, notes: editForm.notes || null })',
     'body: JSON.stringify({ full_name: editForm.full_name, salary_amount: Number(editForm.salary_amount) || 0, work_hours_per_day: Number(editForm.work_hours_per_day) || 8, job_title: editForm.job_title || null, phone: editForm.phone || null, pin_code: editForm.pin_code || null, notes: editForm.notes || null, auto_checkout_time: editForm.auto_checkout_time || null })'
   )
+}
 
-  // UI field in edit modal before save buttons
-  const phoneField = '<div><label className="label">واتساب / هاتف دولي</label><input className="input-field" value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} dir="ltr" placeholder="+90 5xx xxx xxxx" style={{ textAlign: \'left\' }} /></div>'
-  const phoneWithAuto = phoneField + '\n              <div><label className="label">انصراف تلقائي (وقت الإيقاف والحفظ)</label><input className="input-field" type="time" value={editForm.auto_checkout_time || \'\'} onChange={(e) => setEditForm({ ...editForm, auto_checkout_time: e.target.value })} dir="ltr" /><p className="m-0 mt-1 text-[11px]" style={{ color: \'var(--muted)\' }}>عند حلول هذا الوقت يُوقف التايمر ويُحفظ الدوام تلقائياً إذا كانت الشاشة مفتوحة.</p></div>'
-  if (t.includes(phoneField)) t = t.replace(phoneField, phoneWithAuto)
+// Replace native time input (or previous inject) with FancyTimePicker
+{
+  const nativeBlock =
+    '<div><label className="label">انصراف تلقائي (وقت الإيقاف والحفظ)</label><input className="input-field" type="time" value={editForm.auto_checkout_time || \'\'} onChange={(e) => setEditForm({ ...editForm, auto_checkout_time: e.target.value })} dir="ltr" /><p className="m-0 mt-1 text-[11px]" style={{ color: \'var(--muted)\' }}>عند حلول هذا الوقت يُوقف التايمر ويُحفظ الدوام تلقائياً إذا كانت الشاشة مفتوحة.</p></div>'
 
-  // Auto checkout effect — insert after hasRunningSession effect block
+  const fancyBlock =
+    '<FancyTimePicker value={editForm.auto_checkout_time || \'\'} onChange={(v) => setEditForm({ ...editForm, auto_checkout_time: v })} label="انصراف تلقائي (إيقاف وحفظ)" />'
+
+  if (t.includes(nativeBlock)) {
+    t = t.replace(nativeBlock, fancyBlock)
+  } else if (!t.includes('FancyTimePicker value={editForm.auto_checkout_time')) {
+    // insert after phone field
+    const phoneField =
+      '<div><label className="label">واتساب / هاتف دولي</label><input className="input-field" value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} dir="ltr" placeholder="+90 5xx xxx xxxx" style={{ textAlign: \'left\' }} /></div>'
+    if (t.includes(phoneField)) {
+      t = t.replace(phoneField, phoneField + '\n              ' + fancyBlock)
+    }
+  }
+}
+
+// Auto checkout effect
+if (!t.includes('انصراف تلقائي حسب وقت كل موظف')) {
   const marker = '}, [hasRunningSession])'
   const autoEffect = `}, [hasRunningSession])
 
@@ -90,7 +123,6 @@ if (!t.includes('auto_checkout_time')) {
         if (autoSavingRef.current[emp.id]) continue
         const [hh, mm] = auto.split(':').map(Number)
         const target = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hh, mm, 0, 0)
-        // فقط إذا بدأ الدوام قبل وقت الإيقاف ووصلنا للوقت أو تجاوزناه
         if (now.getTime() < target.getTime()) continue
         if (sess.startMs >= target.getTime()) continue
         autoSavingRef.current[emp.id] = true
@@ -135,10 +167,7 @@ if (!t.includes('auto_checkout_time')) {
     return () => clearInterval(id)
   }, [employees, sessions])`
 
-  // escape carefully - the marker appears once after hasRunningSession effect
-  if (t.includes(marker) && !t.includes('انصراف تلقائي حسب وقت كل موظف')) {
-    t = t.replace(marker, autoEffect)
-  }
+  if (t.includes(marker)) t = t.replace(marker, autoEffect)
 }
 
 fs.writeFileSync(path.join(dir, 'HomeBoard.tsx'), t)
@@ -146,5 +175,6 @@ console.log(
   'HomeBoard joined',
   t.length,
   t.includes('DeleteMonthRecords') ? '+DeleteMonthRecords' : '',
-  t.includes('auto_checkout_time') ? '+autoCheckout' : ''
+  t.includes('auto_checkout_time') ? '+autoCheckout' : '',
+  t.includes('FancyTimePicker') ? '+FancyTime' : ''
 )
