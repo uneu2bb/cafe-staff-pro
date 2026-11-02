@@ -47,37 +47,21 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-/* selection */
 ::selection {
   background: rgba(214, 168, 79, 0.35);
   color: #fff;
 }
 
-/* scrollbars */
-*::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-*::-webkit-scrollbar-track {
-  background: transparent;
-}
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track { background: transparent; }
 *::-webkit-scrollbar-thumb {
   background: rgba(214, 168, 79, 0.25);
   border-radius: 99px;
 }
-*::-webkit-scrollbar-thumb:hover {
-  background: rgba(214, 168, 79, 0.4);
-}
+*::-webkit-scrollbar-thumb:hover { background: rgba(214, 168, 79, 0.4); }
 
-button,
-input,
-select,
-textarea {
-  font: inherit;
-}
-button {
-  cursor: pointer;
-}
+button, input, select, textarea { font: inherit; }
+button { cursor: pointer; }
 
 /* ========== Buttons ========== */
 .btn-primary,
@@ -99,9 +83,7 @@ button {
   box-shadow: 0 12px 32px rgba(214, 168, 79, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 .btn-primary:active,
-.btn-gold:active {
-  transform: translateY(0);
-}
+.btn-gold:active { transform: translateY(0); }
 .btn-primary:disabled,
 .btn-gold:disabled {
   opacity: 0.45;
@@ -136,9 +118,7 @@ button {
   font-weight: 800;
   transition: 0.18s;
 }
-.btn-success:hover {
-  background: rgba(29, 191, 115, 0.22);
-}
+.btn-success:hover { background: rgba(29, 191, 115, 0.22); }
 .btn-danger {
   background: var(--red-soft);
   border: 1px solid rgba(224, 72, 86, 0.45);
@@ -148,14 +128,11 @@ button {
   font-weight: 800;
   transition: 0.18s;
 }
-.btn-danger:hover {
-  background: rgba(224, 72, 86, 0.22);
-}
+.btn-danger:hover { background: rgba(224, 72, 86, 0.22); }
 
 /* ========== Cards ========== */
 .card {
-  background:
-    linear-gradient(160deg, rgba(20, 30, 40, 0.95) 0%, rgba(10, 16, 22, 0.98) 100%);
+  background: linear-gradient(160deg, rgba(20, 30, 40, 0.95) 0%, rgba(10, 16, 22, 0.98) 100%);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
@@ -163,9 +140,7 @@ button {
   backdrop-filter: blur(12px);
   transition: border-color 0.2s, box-shadow 0.2s;
 }
-.card:hover {
-  border-color: rgba(214, 168, 79, 0.32);
-}
+.card:hover { border-color: rgba(214, 168, 79, 0.32); }
 
 .glass {
   background: rgba(11, 18, 24, 0.82);
@@ -177,36 +152,46 @@ button {
 /* ========== Stat cards ========== */
 .stat-card,
 .stat {
-  min-height: 100px;
+  min-height: 108px;
   border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border-radius: 18px;
   background:
-    linear-gradient(145deg, rgba(22, 32, 42, 0.98) 0%, rgba(9, 14, 18, 0.99) 100%);
-  padding: 16px 18px;
+    linear-gradient(145deg, rgba(24, 34, 44, 0.98) 0%, rgba(9, 14, 18, 0.99) 100%);
+  padding: 18px 18px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   box-shadow: var(--shadow);
   position: relative;
   overflow: hidden;
-  transition: transform 0.2s ease, border-color 0.2s;
+  transition: transform 0.22s ease, border-color 0.22s, box-shadow 0.22s;
 }
 .stat-card:hover,
 .stat:hover {
-  transform: translateY(-2px);
+  transform: translateY(-3px);
   border-color: var(--line-strong);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(214, 168, 79, 0.08);
 }
 .stat:after,
 .stat-card:after {
   content: '';
   position: absolute;
-  width: 120px;
-  height: 120px;
+  width: 140px;
+  height: 140px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(214, 168, 79, 0.08), transparent 70%);
-  left: -40px;
-  top: -50px;
+  background: radial-gradient(circle, rgba(214, 168, 79, 0.11), transparent 70%);
+  left: -45px;
+  top: -55px;
   pointer-events: none;
+}
+.stat > div:last-child,
+.stat-card > div:last-child {
+  width: 44px !important;
+  height: 44px !important;
+  border-radius: 14px !important;
+  background: linear-gradient(145deg, rgba(214, 168, 79, 0.18), rgba(16, 22, 28, 0.9));
+  border: 1px solid rgba(214, 168, 79, 0.4) !important;
+  box-shadow: 0 4px 14px rgba(214, 168, 79, 0.12);
 }
 
 /* ========== Forms ========== */
@@ -221,17 +206,13 @@ button {
   box-sizing: border-box;
   transition: border-color 0.18s, box-shadow 0.18s, background 0.18s;
 }
-.input-field:hover {
-  border-color: rgba(214, 168, 79, 0.28);
-}
+.input-field:hover { border-color: rgba(214, 168, 79, 0.28); }
 .input-field:focus {
   border-color: var(--gold);
   background: #0a1016;
   box-shadow: 0 0 0 3px rgba(214, 168, 79, 0.14);
 }
-.input-field::placeholder {
-  color: #5c6770;
-}
+.input-field::placeholder { color: #5c6770; }
 
 .label {
   display: block;
@@ -260,8 +241,7 @@ button {
   width: min(460px, 100%);
   max-height: 90vh;
   overflow-y: auto;
-  background:
-    linear-gradient(165deg, #141e28 0%, #0c1319 100%);
+  background: linear-gradient(165deg, #141e28 0%, #0c1319 100%);
   border: 1px solid var(--line-strong);
   border-radius: 20px;
   padding: 24px;
@@ -269,7 +249,27 @@ button {
   animation: scaleIn 0.22s ease;
 }
 
-/* ========== Sidebar nav ========== */
+/* ========== Sidebar ========== */
+aside.csp-sidebar {
+  background: linear-gradient(180deg, #0e141b 0%, #080c10 55%, #06090c 100%) !important;
+  border-left: 1px solid rgba(214, 168, 79, 0.28) !important;
+  box-shadow: -12px 0 40px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(20px);
+}
+aside.csp-sidebar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 80% 40% at 50% 0%, rgba(214, 168, 79, 0.07), transparent 60%);
+}
+aside.csp-sidebar .side-nav-item {
+  position: relative;
+  z-index: 1;
+  margin-bottom: 4px;
+}
+
 .side-nav-item {
   border: 1px solid transparent;
   background: transparent;
@@ -304,26 +304,26 @@ button {
   letter-spacing: 0.01em;
 }
 
-/* ========== Pills / badges ========== */
+/* ========== Pills ========== */
 .pill {
   font-size: 10px;
   border-radius: 999px;
-  padding: 4px 12px;
+  padding: 5px 13px;
   color: white;
-  min-width: 58px;
+  min-width: 64px;
   text-align: center;
   background: var(--green);
   display: inline-block;
   font-weight: 800;
   letter-spacing: 0.02em;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.28);
 }
 .pill.red { background: linear-gradient(135deg, #c93a48, #e04856); }
 .pill.orange { background: linear-gradient(135deg, #c47a18, #e09a2b); }
 .pill.gold { background: linear-gradient(135deg, #a67a2e, #d6a84f); color: #1a1408; }
 .pill.blue { background: linear-gradient(135deg, #3a7eb8, #5aa3e0); }
 
-/* ========== Tables (premium) ========== */
+/* ========== Tables ========== */
 table {
   border-collapse: separate;
   border-spacing: 0;
@@ -331,16 +331,15 @@ table {
 table thead th {
   font-size: 11px;
   font-weight: 800;
-  color: var(--gold2);
-  letter-spacing: 0.04em;
-  text-transform: none;
-  padding: 12px 10px;
-  border-bottom: 1px solid var(--line);
-  background: rgba(214, 168, 79, 0.04);
+  color: var(--gold2) !important;
+  letter-spacing: 0.03em;
+  padding: 13px 10px !important;
+  border-bottom: 1px solid var(--line) !important;
+  background: linear-gradient(180deg, rgba(214, 168, 79, 0.08), rgba(214, 168, 79, 0.02)) !important;
 }
 table tbody td {
-  padding: 11px 10px;
-  border-bottom: 1px solid rgba(120, 135, 150, 0.1);
+  padding: 12px 10px !important;
+  border-bottom: 1px solid rgba(120, 135, 150, 0.1) !important;
   font-size: 13px;
   vertical-align: middle;
 }
@@ -348,7 +347,46 @@ table tbody tr {
   transition: background 0.15s;
 }
 table tbody tr:hover {
-  background: rgba(214, 168, 79, 0.04);
+  background: rgba(214, 168, 79, 0.045);
+}
+
+/* Action buttons inside employee table */
+table tbody td button {
+  border-radius: 9px !important;
+  transition: transform 0.15s, filter 0.15s, box-shadow 0.15s !important;
+}
+table tbody td button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.12);
+}
+table tbody td button:disabled {
+  opacity: 0.35;
+}
+
+/* ========== Section headers in cards ========== */
+.card > h3 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 10px;
+  margin-bottom: 14px !important;
+  border-bottom: 1px solid rgba(214, 168, 79, 0.12);
+  color: var(--gold2) !important;
+  font-weight: 900 !important;
+}
+
+/* Search input in employee list */
+.card input[type="search"],
+.card input[placeholder*="ابحث"] {
+  border-radius: 12px !important;
+  background: #070c11 !important;
+  border: 1px solid rgba(120, 135, 150, 0.22) !important;
+}
+
+/* Top header bar inside main */
+.csp-main-wrap > header,
+.csp-main-wrap > div:first-child {
+  /* soft glass header feel when applicable */
 }
 
 /* ========== Charts ========== */
@@ -415,7 +453,6 @@ table tbody tr:hover {
   animation: fadeUp 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-/* subtle gold underline accent for section headers */
 .section-head {
   display: flex;
   align-items: center;
@@ -430,7 +467,6 @@ table tbody tr:hover {
   background: linear-gradient(180deg, var(--gold2), var(--gold3));
 }
 
-/* skeleton loading */
 .skeleton {
   background: linear-gradient(90deg, #121a22 25%, #1a2430 50%, #121a22 75%);
   background-size: 200% 100%;
@@ -438,15 +474,37 @@ table tbody tr:hover {
   border-radius: 8px;
 }
 
+/* Employee table wrapper polish */
+#employees-section,
+section.card {
+  border-radius: 18px;
+}
+#employees-section .overflow-x-auto,
+section.card .overflow-x-auto {
+  border-radius: 14px;
+  border: 1px solid rgba(214, 168, 79, 0.1);
+  background: rgba(0, 0, 0, 0.15);
+}
+
+/* Timer running glow */
+table tbody td .font-bold[style*="55d39d"],
+table tbody td[style*="55d39d"] {
+  text-shadow: 0 0 12px rgba(85, 211, 157, 0.35);
+}
+
 @media (max-width: 760px) {
   .chart-wrap { height: 160px; }
   .stat-card,
   .stat {
-    min-height: 88px;
+    min-height: 92px;
     padding: 14px;
+    border-radius: 14px;
   }
   .modal-panel {
     padding: 18px;
     border-radius: 16px;
+  }
+  aside.csp-sidebar {
+    box-shadow: -8px 0 32px rgba(0, 0, 0, 0.5);
   }
 }
