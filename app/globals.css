@@ -63,7 +63,6 @@ body {
 button, input, select, textarea { font: inherit; }
 button { cursor: pointer; }
 
-/* ========== Buttons ========== */
 .btn-primary,
 .btn-gold {
   border: 1px solid rgba(241, 206, 131, 0.55);
@@ -130,7 +129,6 @@ button { cursor: pointer; }
 }
 .btn-danger:hover { background: rgba(224, 72, 86, 0.22); }
 
-/* ========== Cards ========== */
 .card {
   background: linear-gradient(160deg, rgba(20, 30, 40, 0.95) 0%, rgba(10, 16, 22, 0.98) 100%);
   border: 1px solid var(--line);
@@ -149,7 +147,6 @@ button { cursor: pointer; }
   -webkit-backdrop-filter: blur(16px);
 }
 
-/* ========== Stat cards ========== */
 .stat-card,
 .stat {
   min-height: 108px;
@@ -193,7 +190,6 @@ button { cursor: pointer; }
   box-shadow: 0 4px 14px rgba(214, 168, 79, 0.12);
 }
 
-/* ========== Forms ========== */
 .input-field {
   width: 100%;
   background: #070c11;
@@ -222,7 +218,6 @@ button { cursor: pointer; }
   letter-spacing: 0.02em;
 }
 
-/* ========== Modal ========== */
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -264,13 +259,6 @@ button { cursor: pointer; }
   border-radius: 12px;
 }
 
-/* Report modal wider polish */
-.modal-panel[style*='520'],
-.modal-panel[style*='maxWidth'] {
-  border-radius: 24px;
-}
-
-/* ========== Sidebar ========== */
 aside.csp-sidebar {
   background: linear-gradient(180deg, #0e141b 0%, #080c10 55%, #06090c 100%) !important;
   border-left: 1px solid rgba(214, 168, 79, 0.28) !important;
@@ -324,14 +312,14 @@ aside.csp-sidebar .side-nav-item {
   letter-spacing: 0.01em;
 }
 
-/* ========== Pills ========== */
 .pill {
   font-size: 10px;
   border-radius: 999px;
   padding: 5px 13px;
   color: white;
   min-width: 64px;
-  text-align: center;\n  background: var(--green);
+  text-align: center;
+  background: var(--green);
   display: inline-block;
   font-weight: 800;
   letter-spacing: 0.02em;
@@ -342,7 +330,6 @@ aside.csp-sidebar .side-nav-item {
 .pill.gold { background: linear-gradient(135deg, #a67a2e, #d6a84f); color: #1a1408; }
 .pill.blue { background: linear-gradient(135deg, #3a7eb8, #5aa3e0); }
 
-/* ========== Tables ========== */
 table { border-collapse: separate; border-spacing: 0; }
 table thead th {
   font-size: 11px;
@@ -371,7 +358,6 @@ table tbody td button:hover:not(:disabled) {
 }
 table tbody td button:disabled { opacity: 0.35; }
 
-/* ========== Section headers ========== */
 .card > h3 {
   display: flex;
   align-items: center;
@@ -390,7 +376,6 @@ table tbody td button:disabled { opacity: 0.35; }
   border: 1px solid rgba(120, 135, 150, 0.22) !important;
 }
 
-/* ========== Withdrawals section ========== */
 #withdrawals-section {
   position: relative;
   overflow: hidden;
@@ -411,7 +396,6 @@ table tbody td button:disabled { opacity: 0.35; }
   color: var(--gold2) !important;
 }
 
-/* Report summary mini-cards inside modal */
 .report-stat-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -436,7 +420,6 @@ table tbody td button:disabled { opacity: 0.35; }
   margin-top: 2px;
 }
 
-/* ========== Charts ========== */
 .chart-wrap {
   height: 185px;
   display: flex;
@@ -479,7 +462,6 @@ table tbody td button:disabled { opacity: 0.35; }
   color: var(--muted);
 }
 
-/* ========== Animations ========== */
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -533,11 +515,6 @@ section.card .overflow-x-auto {
 table tbody td .font-bold[style*="55d39d"],
 table tbody td[style*="55d39d"] {
   text-shadow: 0 0 12px rgba(85, 211, 157, 0.35);
-}
-
-/* Toast-like success areas inside modals */
-.modal-panel .text-center[style*="muted"] {
-  letter-spacing: 0.02em;
 }
 
 @media (max-width: 760px) {
